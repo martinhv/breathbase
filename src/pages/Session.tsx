@@ -74,7 +74,7 @@ function SessionInner({ technique }: { technique: Technique }) {
       // Per-phase piano phrase — duration drives the arpeggio speed so
       // music stays locked to the breath rhythm.
       audio.playPhrase(phase.kind, phase.durationMs, phase.cycleNumber);
-      if (phase.voicePrompt) speak(phase.voicePrompt);
+      if (phase.voicePrompt) speak(phase.voicePrompt, phase.durationMs);
       vibrate(50);
     },
     [audio, speak, vibrate],

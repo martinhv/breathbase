@@ -57,6 +57,8 @@ Timing is driven by a single `requestAnimationFrame` loop — never `setTimeout`
 
 Web Speech API is **not** used (Firefox/Linux defaults to eSpeak, which is robotic). Instead, every `voicePrompt` string maps to a slug via `PROMPT_SLUGS` in `useSpeech.ts`, and clips live at `public/voice/{profileId}/{slug}.mp3`. The active profile comes from `settings.voiceProfile`; available profiles are declared in `lib/voiceProfiles.ts`.
 
+`speak(text, durationMs)` plays the action prompt on a *main* audio channel, then schedules count clips (`count-1` … `count-15`) on a *second* audio channel at 60% volume. Counts fire at `durationMs - n*1000` ms after phase start, skipping any that would land while the action prompt is still playing. Per-clip action durations are measured once on profile change via `loadedmetadata`. Phases under 3 s skip countdown entirely.
+
 To add a **new prompt**: add it to `PROMPT_SLUGS` and to the `PHRASES` array in `scripts/generate-voice.sh`, then run the script (requires `pip install edge-tts`) — it regenerates the slug for every voice profile.
 
 To add a **new voice**: append to `VOICE_PROFILES` in `voiceProfiles.ts` and add a matching `id:edge-voice-name` line to `VOICES` in `generate-voice.sh`, then run the script (optionally pass the new id as an arg to render only that one).

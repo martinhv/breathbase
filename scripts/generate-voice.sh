@@ -15,12 +15,13 @@ set -euo pipefail
 
 # Pipe-separated: id|edge-voice|rate|pitch.
 # Keep ids in sync with src/lib/voiceProfiles.ts.
+# Rate -35%: calm, slow cadence appropriate for guided breathwork.
 VOICES=(
-  "aria|en-US-AriaNeural|-25%|+0Hz"
-  "jenny|en-US-JennyNeural|-25%|+0Hz"
-  "guy|en-US-GuyNeural|-25%|+0Hz"
-  "libby|en-GB-LibbyNeural|-25%|+0Hz"
-  "thomas|en-GB-ThomasNeural|-25%|-10Hz"
+  "aria|en-US-AriaNeural|-35%|+0Hz"
+  "jenny|en-US-JennyNeural|-35%|+0Hz"
+  "guy|en-US-GuyNeural|-35%|+0Hz"
+  "libby|en-GB-LibbyNeural|-35%|+0Hz"
+  "thomas|en-GB-ThomasNeural|-35%|-10Hz"
 )
 
 OUT_ROOT="$(dirname "$0")/../public/voice"
@@ -42,6 +43,24 @@ declare -A PHRASES=(
   ["settle"]="Settle"
   ["rest"]="Rest"
   ["preview"]="Breathe in. Hold. Breathe out."
+  # Countdown clips spoken at lower volume while a phase winds down.
+  # Need up to 15 to cover the longer phases (8s exhale in 4-7-8, 10s
+  # rest in bellows). Phases longer than 15s only count the final 15s.
+  ["count-1"]="One"
+  ["count-2"]="Two"
+  ["count-3"]="Three"
+  ["count-4"]="Four"
+  ["count-5"]="Five"
+  ["count-6"]="Six"
+  ["count-7"]="Seven"
+  ["count-8"]="Eight"
+  ["count-9"]="Nine"
+  ["count-10"]="Ten"
+  ["count-11"]="Eleven"
+  ["count-12"]="Twelve"
+  ["count-13"]="Thirteen"
+  ["count-14"]="Fourteen"
+  ["count-15"]="Fifteen"
 )
 
 # Filter voices if any args were passed.
