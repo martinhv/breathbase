@@ -11,6 +11,7 @@ import {
 } from "@/lib/storage";
 import { TECHNIQUES } from "@/lib/techniques";
 import { VOICE_PROFILES } from "@/lib/voiceProfiles";
+import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
 
 type ToggleProps = {
   label: string;
@@ -387,6 +388,26 @@ export function Settings() {
           Reset settings
         </button>
       </section>
+
+      <footer className="text-center text-[11px] text-slate-500 leading-relaxed pt-2 pb-4">
+        <a
+          href={SOURCE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="underline-offset-2 hover:underline"
+        >
+          Source code
+        </a>
+        {" · "}
+        <a
+          href={LICENSE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="underline-offset-2 hover:underline"
+        >
+          {LICENSE_NAME}
+        </a>
+      </footer>
 
       <DisclaimerModal
         open={showDisclaimer}

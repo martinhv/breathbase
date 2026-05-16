@@ -239,3 +239,30 @@ vary. If you have a medical condition or are pregnant, please consult a
 physician before practicing. Stop immediately if you feel dizzy or
 lightheaded. Do not practice upregulating techniques in or near water
 or while operating vehicles or machinery.
+
+---
+
+## License
+
+BreathBase is licensed under the [GNU Affero General Public License
+v3.0 or later](LICENSE) (AGPL-3.0-or-later).
+
+In plain English:
+
+- ✅ **Self-host it.** Run it for yourself, your family, your school,
+  your team — for any purpose. No restrictions.
+- ✅ **Modify and redistribute it.** Fork it, change it, share it.
+- ✅ **Read the source.** All of it. No hidden parts.
+- ⚠️ **If you offer a modified version as a network service** (a
+  hosted SaaS, a web app others sign in to), AGPL §13 requires you to
+  publish your full modified source code, under AGPL-3.0, to every
+  user of that service. There is no "use it internally and keep your
+  changes secret" loophole for network use.
+
+This is intentional. BreathBase is meant to be a public, auditable
+educational tool — not a free starter kit for someone to wrap in a
+paywall. Self-hosting is welcome and encouraged; running a closed
+commercial fork is not.
+
+If AGPL doesn't fit your use case and you'd like to discuss a
+commercial license, open an issue.

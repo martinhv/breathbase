@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "description": "BreathBase — Foundational breathwork, grounded in science.",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/martinhv/breathbase.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

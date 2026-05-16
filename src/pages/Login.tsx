@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
 
 export function Login() {
   const { signInWithGoogle, error } = useAuth();
@@ -47,6 +48,26 @@ export function Login() {
         <p className="text-[11px] text-slate-500 text-center max-w-xs mx-auto leading-relaxed">
           By continuing you agree to use this app as an educational tool, not
           medical advice. See safety details after sign-in.
+        </p>
+        <p className="text-[11px] text-slate-500 text-center pt-2">
+          Open source —{" "}
+          <a
+            href={SOURCE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:underline"
+          >
+            view source
+          </a>
+          {" · "}
+          <a
+            href={LICENSE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:underline"
+          >
+            {LICENSE_NAME}
+          </a>
         </p>
       </div>
     </div>
