@@ -171,6 +171,13 @@ export function Settings() {
             onChange={(v) => update({ voiceEnabled: v })}
           />
           {settings.voiceEnabled && (
+            <Toggle
+              label="Count down remaining seconds"
+              checked={settings.countdownEnabled}
+              onChange={(v) => update({ countdownEnabled: v })}
+            />
+          )}
+          {settings.voiceEnabled && (
             <div
               role="radiogroup"
               aria-label="Voice"

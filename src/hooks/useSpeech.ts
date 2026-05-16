@@ -35,11 +35,11 @@ const PROMPT_SLUGS: Record<string, string> = {
 const PREVIEW_SLUG = "preview";
 const MAX_COUNT = 15;
 
-// Counts are *also* baked at 0.5x amplitude with a bandpass filter at
-// generate time (see scripts/generate-voice.sh) for an airy whisper-ish
-// quality. The JS-side ratio stacks on top to give counts ~30% of the
-// action prompt's perceived volume.
-const COUNT_VOLUME_RATIO = 0.6;
+// Counts have a per-N whisper filter + volume gradient baked in at generate
+// time (see whisper_filter_for_count in scripts/generate-voice.sh): count-15
+// at ~0.55 down to count-1 at ~0.18, so they hush as the phase winds down.
+// The JS-side ratio stays at 1.0 — the file is the source of truth.
+const COUNT_VOLUME_RATIO = 1.0;
 
 /** Don't bother counting on phases shorter than this. */
 const COUNT_MIN_PHASE_MS = 3000;
@@ -56,15 +56,19 @@ const clipUrl = (profileId: string, slug: string): string =>
 export function useSpeech() {
   const { settings } = useSettings();
 
-  // Two parallel <audio> elements — action and count run on separate channels
-  // because counts may need to start before action finishes decaying.
+  // The action prompt plays on one shared <audio> element (its src swaps
+  // between prompts; that's fine because action prompts are seconds apart).
   const mainAudioRef = useRef<HTMLAudioElement | null>(null);
-  const countAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Count clips each get their own preloaded <audio> element. Otherwise a
+  // single shared element has to swap .src between count-3 / count-2 /
+  // count-1 at one-second intervals, and the resulting load race can clip
+  // the start of the third clip. With one element per count, .play() acts
+  // on a fully-loaded element — instant, deterministic.
+  const countAudiosRef = useRef<HTMLAudioElement[]>([]);
+
   if (mainAudioRef.current === null && typeof window !== "undefined") {
     mainAudioRef.current = new Audio();
     mainAudioRef.current.preload = "auto";
-    countAudioRef.current = new Audio();
-    countAudioRef.current.preload = "auto";
   }
 
   // Pending setTimeout IDs for scheduled count clips; cleared on cancel/new speak.
@@ -77,26 +81,42 @@ export function useSpeech() {
   useEffect(() => {
     const v = Math.max(0, Math.min(1, settings.voiceVolume));
     if (mainAudioRef.current) mainAudioRef.current.volume = v;
-    if (countAudioRef.current) countAudioRef.current.volume = v * COUNT_VOLUME_RATIO;
+    for (const el of countAudiosRef.current) {
+      el.volume = v * COUNT_VOLUME_RATIO;
+    }
   }, [settings.voiceVolume]);
 
-  // Preload action-clip durations whenever the voice profile changes. Using
-  // `loadedmetadata` is enough — we never need the audio bytes here, just
-  // the duration so countdown scheduling can leave room for the action.
+  // (Re)build the per-count audio pool + preload action-clip durations
+  // whenever the voice profile changes.
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const profile = findVoiceProfile(settings.voiceProfile);
+
+    // Action-clip durations (for countdown scheduling). Metadata-only fetch.
     actionDurationsRef.current = new Map();
-    const slugs = Object.values(PROMPT_SLUGS);
-    for (const slug of slugs) {
+    for (const slug of Object.values(PROMPT_SLUGS)) {
       const a = new Audio(clipUrl(profile.id, slug));
       a.preload = "metadata";
-      const onLoaded = () => {
-        if (!Number.isFinite(a.duration)) return;
-        actionDurationsRef.current.set(slug, a.duration * 1000);
-      };
-      a.addEventListener("loadedmetadata", onLoaded, { once: true });
+      a.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (!Number.isFinite(a.duration)) return;
+          actionDurationsRef.current.set(slug, a.duration * 1000);
+        },
+        { once: true },
+      );
     }
-  }, [settings.voiceProfile]);
+
+    // Count-clip pool. One Audio element per count number, preloaded.
+    const vol =
+      Math.max(0, Math.min(1, settings.voiceVolume)) * COUNT_VOLUME_RATIO;
+    countAudiosRef.current = Array.from({ length: MAX_COUNT }, (_, i) => {
+      const a = new Audio(clipUrl(profile.id, `count-${i + 1}`));
+      a.preload = "auto";
+      a.volume = vol;
+      return a;
+    });
+  }, [settings.voiceProfile, settings.voiceVolume]);
 
   const clearScheduled = useCallback(() => {
     for (const id of pendingTimeoutsRef.current) clearTimeout(id);
@@ -126,6 +146,7 @@ export function useSpeech() {
       const profile = findVoiceProfile(settings.voiceProfile);
       playOn(mainAudioRef.current, clipUrl(profile.id, slug));
 
+      if (!settings.countdownEnabled) return;
       if (!durationMs || durationMs < COUNT_MIN_PHASE_MS) return;
 
       const actionMs =
@@ -143,25 +164,34 @@ export function useSpeech() {
         if (fireAt < earliestCountStartMs) continue;
         if (fireAt >= durationMs) continue;
         const handle = window.setTimeout(() => {
-          playOn(countAudioRef.current, clipUrl(profile.id, `count-${n}`));
+          const el = countAudiosRef.current[n - 1];
+          if (!el) return;
+          el.pause();
+          el.currentTime = 0;
+          void el.play().catch(() => {});
         }, fireAt);
         pendingTimeoutsRef.current.push(handle);
       }
     },
-    [settings.voiceEnabled, settings.voiceProfile, playOn, clearScheduled],
+    [
+      settings.voiceEnabled,
+      settings.voiceProfile,
+      settings.countdownEnabled,
+      playOn,
+      clearScheduled,
+    ],
   );
 
   const cancel = useCallback(() => {
     clearScheduled();
     const m = mainAudioRef.current;
-    const c = countAudioRef.current;
     if (m) {
       m.pause();
       m.currentTime = 0;
     }
-    if (c) {
-      c.pause();
-      c.currentTime = 0;
+    for (const el of countAudiosRef.current) {
+      el.pause();
+      el.currentTime = 0;
     }
   }, [clearScheduled]);
 

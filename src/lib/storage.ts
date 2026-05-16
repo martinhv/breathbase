@@ -43,6 +43,8 @@ export type Settings = {
   voiceEnabled: boolean;
   /** Voice profile id; see VOICE_PROFILES in voiceProfiles.ts. */
   voiceProfile: string;
+  /** Whisper-style countdown of the remaining seconds in each phase. */
+  countdownEnabled: boolean;
   musicEnabled: boolean;
   chimesEnabled: boolean;
   hapticsEnabled: boolean;
@@ -62,6 +64,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   voiceEnabled: true,
   voiceProfile: DEFAULT_VOICE_PROFILE,
+  countdownEnabled: true,
   musicEnabled: true,
   chimesEnabled: true,
   hapticsEnabled: true,
