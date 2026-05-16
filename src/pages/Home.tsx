@@ -9,6 +9,7 @@ import {
   totalMinutes,
   type SessionEntry,
 } from "@/lib/storage";
+import { useAuth } from "@/lib/auth";
 
 function formatRelative(iso: string): string {
   const d = new Date(iso);
@@ -20,8 +21,23 @@ function formatRelative(iso: string): string {
 }
 
 export function Home() {
+  const { user } = useAuth();
   const [history, setHistory] = useState<SessionEntry[]>([]);
-  useEffect(() => setHistory(loadHistory()), []);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    loadHistory(user.uid)
+      .then((h) => {
+        if (!cancelled) setHistory(h);
+      })
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("Failed to load history:", e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
   const streak = computeStreak(history);
   const minutes = totalMinutes(history);
   const last = lastSession(history);

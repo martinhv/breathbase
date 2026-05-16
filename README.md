@@ -2,15 +2,16 @@
 
 **Foundational breathwork, grounded in science.**
 
-BreathBase is a mobile-first, client-side PWA for guided breathwork. It
-covers the *Foundational* tier of practice — awareness, relaxation, and
-basic breath control — with nine evidence-based techniques across four
-states: downregulate, upregulate, balance, and focus.
+BreathBase is a mobile-first PWA for guided breathwork. It covers the
+*Foundational* tier of practice — awareness, relaxation, and basic breath
+control — with nine evidence-based techniques across four states:
+downregulate, upregulate, balance, and focus.
 
 The app uses synthesized ambient audio (Tone.js), an animated breathing
 orb (Framer Motion) tightly synchronized to the breath cycle, optional
-voice guidance (Web Speech API), and haptic feedback. All data is stored
-locally; no backend, no accounts, no analytics.
+voice guidance (Web Speech API), and haptic feedback. Sign-in is required
+(Google) and per-user settings + session history are persisted in
+Firestore so they sync across devices. No analytics.
 
 ---
 
@@ -18,10 +19,34 @@ locally; no backend, no accounts, no analytics.
 
 ```bash
 npm install
+cp .env.example .env.local   # then fill in your Firebase web-app credentials
 npm run dev
 ```
 
 Open the URL Vite prints (typically `http://localhost:5173`).
+
+### Firebase setup
+
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com).
+2. **Authentication** → enable the *Google* sign-in provider.
+3. **Firestore Database** → create in production mode and paste these rules
+   (users can only access their own subtree):
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid}/{document=**} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+
+4. **Project settings → Your apps → Web app** → register a new web app and
+   copy the six config values into `.env.local`.
+5. **Authentication → Settings → Authorized domains** → add
+   `localhost` (already there by default) and your production domain.
 
 For a production build:
 
@@ -51,7 +76,8 @@ npm run lint   # runs tsc --noEmit
   assets shipped — everything is generated client-side)
 - **Web Speech API** (`SpeechSynthesis`) for voice prompts
 - **`navigator.vibrate`** for phase-transition haptics where supported
-- **`localStorage`** for settings, session history, streak/total stats
+- **Firebase Auth (Google) + Firestore** for sign-in and per-user persistence
+  of settings, session history, and streak/total stats
 - **`vite-plugin-pwa`** for the manifest + service worker
 
 ---
@@ -62,7 +88,9 @@ npm run lint   # runs tsc --noEmit
 src/
 ├── lib/
 │   ├── techniques.ts        # Single source of truth for all techniques.
-│   ├── storage.ts           # localStorage accessors + streak/total stats.
+│   ├── firebase.ts          # Firebase init: auth + db + googleProvider.
+│   ├── auth.tsx             # AuthContext + useAuth hook.
+│   ├── storage.ts           # Firestore accessors + streak/total stats.
 │   └── settings.tsx         # SettingsContext + useSettings hook.
 ├── hooks/
 │   ├── useBreathSession.ts  # Reducer-based FSM driving the breath cycle.
@@ -79,10 +107,11 @@ src/
 │   ├── MoodCheckIn.tsx
 │   └── CategoryCard.tsx
 └── pages/
+    ├── Login.tsx            # Google sign-in (only route until authenticated).
     ├── Home.tsx             # 2×2 category grid + streak / total / last-session.
     ├── Category.tsx         # Technique list with rationale + citation.
     ├── Session.tsx          # Full-screen orb + phase indicator + controls.
-    ├── Settings.tsx         # Toggles, volumes, durations, history, disclaimer.
+    ├── Settings.tsx         # Account, toggles, volumes, durations, history.
     └── Onboarding.tsx       # 3-screen intro for first launch.
 ```
 

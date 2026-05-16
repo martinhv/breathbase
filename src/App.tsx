@@ -7,6 +7,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider, useSettings } from "@/lib/settings";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { Home } from "@/pages/Home";
@@ -14,19 +15,27 @@ import { Category } from "@/pages/Category";
 import { Session } from "@/pages/Session";
 import { Settings } from "@/pages/Settings";
 import { Onboarding } from "@/pages/Onboarding";
+import { Login } from "@/pages/Login";
 
-function FirstLaunchGate({ children }: { children: React.ReactNode }) {
-  const { settings, update } = useSettings();
+function LoadingShell() {
+  return (
+    <div className="min-h-full flex items-center justify-center safe-top safe-bottom">
+      <div className="text-slate-500 text-sm">Loading…</div>
+    </div>
+  );
+}
+
+function SignedInApp() {
+  const { settings, loading, update } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // Skip the gate until the settings provider has loaded from storage.
-    // We approximate "hydrated" by waiting one tick.
+    if (loading) return;
     const id = setTimeout(() => setHydrated(true), 0);
     return () => clearTimeout(id);
-  }, []);
+  }, [loading]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -35,12 +44,21 @@ function FirstLaunchGate({ children }: { children: React.ReactNode }) {
     }
   }, [hydrated, settings.onboarded, location.pathname, navigate]);
 
+  if (loading) return <LoadingShell />;
+
   const showDisclaimer =
     hydrated && settings.onboarded && !settings.disclaimerAcknowledged;
 
   return (
     <>
-      {children}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/category/:id" element={<Category />} />
+        <Route path="/session/:id" element={<Session />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       <DisclaimerModal
         open={showDisclaimer}
         required
@@ -50,27 +68,30 @@ function FirstLaunchGate({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AppRoutes() {
-  return (
-    <FirstLaunchGate>
+function AuthGate() {
+  const { status } = useAuth();
+
+  if (status === "loading") return <LoadingShell />;
+  if (status === "signedOut") {
+    return (
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/category/:id" element={<Category />} />
-        <Route path="/session/:id" element={<Session />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Login />} />
       </Routes>
-    </FirstLaunchGate>
+    );
+  }
+  return (
+    <SettingsProvider>
+      <SignedInApp />
+    </SettingsProvider>
   );
 }
 
 export default function App() {
   return (
-    <SettingsProvider>
+    <AuthProvider>
       <BrowserRouter>
-        <AppRoutes />
+        <AuthGate />
       </BrowserRouter>
-    </SettingsProvider>
+    </AuthProvider>
   );
 }

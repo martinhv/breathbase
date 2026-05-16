@@ -1,10 +1,31 @@
-// LocalStorage-backed persistence for settings, session history, and derived
-// streak/total-minutes stats. Keep all reads/writes funneled through here so
-// schema migrations only need to touch one file.
+// Firestore-backed persistence for settings, session history, and derived
+// streak/total-minutes stats. All reads/writes are scoped to the currently
+// signed-in user's UID, so the caller must pass `uid`.
+//
+//   /users/{uid}/profile/settings          ← single doc, Settings shape
+//   /users/{uid}/sessions/{auto-id}        ← one doc per completed session
+//
+// Stats (streak, totalMinutes, lastSession) remain pure functions over a
+// SessionEntry[] — they don't know about Firestore.
+
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "./firebase";
 
 export type Mood = -2 | -1 | 0 | 1 | 2;
 
 export type SessionEntry = {
+  /** Firestore document ID (omitted on write; populated on read). */
+  id?: string;
   techniqueId: string;
   techniqueName: string;
   category: string;
@@ -53,61 +74,61 @@ export const DEFAULT_SETTINGS: Settings = {
   disclaimerAcknowledged: false,
 };
 
-const SETTINGS_KEY = "bb.settings.v1";
-const HISTORY_KEY = "bb.history.v1";
-const HISTORY_LIMIT = 200; // keep last 200 sessions; surface last 30 in UI
+const HISTORY_LIMIT = 200; // cap reads to last 200 sessions
 
-const safeParse = <T,>(raw: string | null, fallback: T): T => {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+const settingsDoc = (uid: string) => doc(db, "users", uid, "profile", "settings");
+const sessionsCol = (uid: string) => collection(db, "users", uid, "sessions");
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+export const loadSettings = async (uid: string): Promise<Settings> => {
+  const snap = await getDoc(settingsDoc(uid));
+  if (!snap.exists()) return DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS, ...(snap.data() as Partial<Settings>) };
 };
 
-export const loadSettings = (): Settings => {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  const stored = safeParse<Partial<Settings>>(
-    window.localStorage.getItem(SETTINGS_KEY),
-    {},
-  );
-  return { ...DEFAULT_SETTINGS, ...stored };
-};
-
-export const saveSettings = (s: Settings): void => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-};
-
-export const loadHistory = (): SessionEntry[] => {
-  if (typeof window === "undefined") return [];
-  return safeParse<SessionEntry[]>(
-    window.localStorage.getItem(HISTORY_KEY),
-    [],
-  );
-};
-
-export const appendHistory = (entry: SessionEntry): SessionEntry[] => {
-  const next = [entry, ...loadHistory()].slice(0, HISTORY_LIMIT);
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-  }
-  return next;
-};
-
-/** Update the most-recent history entry in place (used by the mood check-in). */
-export const updateLatestMood = (mood: Mood): void => {
-  const history = loadHistory();
-  if (history.length === 0) return;
-  history[0] = { ...history[0], mood };
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  }
+export const saveSettings = async (uid: string, s: Settings): Promise<void> => {
+  await setDoc(settingsDoc(uid), s, { merge: true });
 };
 
 // ---------------------------------------------------------------------------
-// Derived stats
+// History
+// ---------------------------------------------------------------------------
+
+export const loadHistory = async (uid: string): Promise<SessionEntry[]> => {
+  const q = query(
+    sessionsCol(uid),
+    orderBy("startedAt", "desc"),
+    limit(HISTORY_LIMIT),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SessionEntry, "id">) }));
+};
+
+export const appendHistory = async (
+  uid: string,
+  entry: Omit<SessionEntry, "id">,
+): Promise<string> => {
+  // Use a client-generated ID so callers can immediately reference the entry
+  // (e.g. to attach mood after the check-in) without a round-trip.
+  const ref = doc(sessionsCol(uid));
+  await setDoc(ref, entry);
+  return ref.id;
+};
+
+/** Attach a mood rating to an existing session entry. */
+export const updateMood = async (
+  uid: string,
+  sessionId: string,
+  mood: Mood,
+): Promise<void> => {
+  await updateDoc(doc(sessionsCol(uid), sessionId), { mood });
+};
+
+// ---------------------------------------------------------------------------
+// Derived stats (pure)
 // ---------------------------------------------------------------------------
 
 const toUTCDateKey = (iso: string): string => {
@@ -121,8 +142,6 @@ export const computeStreak = (history: SessionEntry[]): number => {
   const days = new Set(history.map((e) => toUTCDateKey(e.startedAt)));
   let streak = 0;
   const now = new Date();
-  // Walk back day by day. Allow the streak to start either today or
-  // yesterday (so missing today before evening doesn't reset it).
   const todayKey = toUTCDateKey(now.toISOString());
   const yesterday = new Date(now);
   yesterday.setUTCDate(now.getUTCDate() - 1);

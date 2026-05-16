@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSettings } from "@/lib/settings";
+import { useAuth } from "@/lib/auth";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
@@ -74,13 +75,28 @@ const Slider = ({
 
 export function Settings() {
   const { settings, update, reset } = useSettings();
+  const { user, signOut } = useAuth();
   const { voices, preferredVoice, preview } = useSpeech();
   const audio = useAudioEngine();
   const [history, setHistory] = useState<SessionEntry[]>([]);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  useEffect(() => setHistory(loadHistory().slice(0, 30)), []);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    loadHistory(user.uid)
+      .then((h) => {
+        if (!cancelled) setHistory(h.slice(0, 30));
+      })
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("Failed to load history:", e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const runTest = async () => {
     setTesting(true);
@@ -101,6 +117,46 @@ export function Settings() {
         </Link>
         <h1 className="text-2xl font-light">Settings</h1>
       </header>
+
+      {user && (
+        <section className="mb-6">
+          <h2 className="text-xs uppercase tracking-widest text-slate-500 mb-1">
+            Account
+          </h2>
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-3">
+            {user.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="w-10 h-10 rounded-full"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-slate-300">
+                {(user.displayName ?? user.email ?? "?").charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              {user.displayName && (
+                <div className="text-sm text-slate-200 truncate">
+                  {user.displayName}
+                </div>
+              )}
+              <div className="text-xs text-slate-400 truncate">
+                {user.email}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                if (confirm("Sign out?")) void signOut();
+              }}
+              className="px-3 py-2 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/5"
+            >
+              Sign out
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="mb-6">
         <h2 className="text-xs uppercase tracking-widest text-slate-500 mb-1">

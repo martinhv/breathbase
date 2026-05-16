@@ -10,10 +10,11 @@ import { useBreathSession, type ExpandedPhase } from "@/hooks/useBreathSession";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useSettings } from "@/lib/settings";
+import { useAuth } from "@/lib/auth";
 import {
   appendHistory,
   type Mood,
-  updateLatestMood,
+  updateMood,
 } from "@/lib/storage";
 import { findTechnique, type Technique } from "@/lib/techniques";
 
@@ -51,6 +52,7 @@ export function Session() {
 function SessionInner({ technique }: { technique: Technique }) {
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const { user } = useAuth();
 
   const duration = useMemo(() => {
     return settings.durationOverrides[technique.id] ?? technique.defaultDurationMin;
@@ -115,13 +117,16 @@ function SessionInner({ technique }: { technique: Technique }) {
     }
   }, [stage, session.status, beginSession]);
 
-  // When the user enters complete stage, write a history entry.
+  // When the user enters complete stage, write a history entry. We keep the
+  // returned doc ID so the mood check-in can attach to *this* session rather
+  // than guessing at "the latest" (which would race if two devices sync).
   const historyWritten = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (stage !== "complete") return;
-    if (historyWritten.current || !technique) return;
+    if (historyWritten.current || !technique || !user) return;
     historyWritten.current = true;
-    appendHistory({
+    appendHistory(user.uid, {
       techniqueId: technique.id,
       techniqueName: technique.name,
       category: technique.category,
@@ -130,8 +135,15 @@ function SessionInner({ technique }: { technique: Technique }) {
       ).toISOString(),
       durationMs: sessionRef.current.totalElapsedMs,
       cyclesCompleted: sessionRef.current.cyclesCompleted,
-    });
-  }, [stage, technique]);
+    })
+      .then((id) => {
+        sessionIdRef.current = id;
+      })
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("Failed to save session:", e);
+      });
+  }, [stage, technique, user]);
 
   // Cleanup audio on unmount.
   useEffect(() => {
@@ -187,7 +199,12 @@ function SessionInner({ technique }: { technique: Technique }) {
 
   if (stage === "mood") {
     const finish = (mood: Mood | null) => {
-      if (mood !== null) updateLatestMood(mood);
+      if (mood !== null && user && sessionIdRef.current) {
+        updateMood(user.uid, sessionIdRef.current, mood).catch((e) => {
+          // eslint-disable-next-line no-console
+          console.error("Failed to save mood:", e);
+        });
+      }
       navigate("/", { replace: true });
     };
     return (

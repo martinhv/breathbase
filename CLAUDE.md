@@ -13,11 +13,26 @@ npm run lint      # tsc --noEmit (type-check only; no test suite)
 
 There are no automated tests. Type-checking (`npm run lint`) is the primary correctness gate.
 
+**Local env:** the app will not run without Firebase credentials. Copy `.env.example` → `.env.local` and fill in the six `VITE_FIREBASE_*` values from your Firebase web-app config. README has the full Firebase setup walkthrough (enable Google provider, Firestore rules).
+
 ## Architecture
 
-BreathBase is a mobile-first PWA (React 18 + TypeScript + Vite). No backend, no accounts — all state in `localStorage`.
+BreathBase is a mobile-first PWA (React 18 + TypeScript + Vite). Auth required (Google sign-in); per-user data lives in Firestore.
 
 **Path alias:** `@/` resolves to `src/`.
+
+### Auth + data model
+
+`AuthProvider` (`lib/auth.tsx`) wraps the tree at the root and exposes `{ user, status, signInWithGoogle, signOut }` via `useAuth()`. `App.tsx`'s `AuthGate` renders `<Login>` when `status === "signedOut"` and the real app (under `SettingsProvider`) when signed in. **`SettingsProvider` mounts only when a user is present** — so anything under it can rely on `user` being non-null inside effects (the providers above will have unmounted the subtree on sign-out).
+
+Firestore layout (rules in README restrict each user to their own subtree):
+
+```
+/users/{uid}/profile/settings        ← single doc
+/users/{uid}/sessions/{auto-id}      ← one doc per completed session
+```
+
+All Firestore access funnels through `lib/storage.ts`; every function takes `uid` as its first argument. `appendHistory` returns the new doc ID so the mood check-in can attach to a specific session rather than guessing at "the latest" (which would race across devices).
 
 ### Data flow
 
@@ -36,7 +51,7 @@ Timing is driven by a single `requestAnimationFrame` loop — never `setTimeout`
 
 ### Settings (`lib/settings.tsx` + `lib/storage.ts`)
 
-`SettingsContext` / `useSettings()` provides app-wide settings. Hydration from `localStorage` is deferred one tick after mount (avoids SSR edge cases). All writes are synchronous via `saveSettings`.
+`SettingsContext` / `useSettings()` exposes `{ settings, loading, update, reset }`. Settings load asynchronously from Firestore on sign-in; `loading` is true until the first fetch resolves. Writes are fire-and-forget through `saveSettings(uid, ...)` — UI state updates immediately, errors are logged. A `loadedUidRef` guards against writing to a previous user's doc if the active user changes mid-flight.
 
 ### Audio (`hooks/useAudioEngine.ts`)
 
@@ -44,7 +59,11 @@ Tone.js is lazy-initialized on the user's first gesture (browser autoplay policy
 
 ### Routing (`App.tsx`)
 
-`FirstLaunchGate` redirects to `/onboarding` until `settings.onboarded` is true, then shows `DisclaimerModal` until `settings.disclaimerAcknowledged` is set. Routes: `/`, `/category/:id`, `/session/:id`, `/settings`, `/onboarding`.
+Three layers, outer to inner:
+
+1. **`AuthGate`** — shows `<Login>` when signed out, otherwise mounts `SettingsProvider`.
+2. **`SignedInApp`** — redirects to `/onboarding` until `settings.onboarded` is true, then shows `DisclaimerModal` until `settings.disclaimerAcknowledged` is set.
+3. **Routes:** `/`, `/category/:id`, `/session/:id`, `/settings`, `/onboarding`.
 
 ### Safety constraint
 
