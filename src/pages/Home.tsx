@@ -70,7 +70,11 @@ export function Home() {
         ))}
       </section>
 
-      <section className="grid grid-cols-3 gap-3 text-center">
+      <Link
+        to="/history"
+        aria-label="View full history"
+        className="grid grid-cols-3 gap-3 text-center hover:opacity-90 transition"
+      >
         <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
           <div className="text-2xl font-light tabular-nums">{streak}</div>
           <div className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">
@@ -91,14 +95,21 @@ export function Home() {
             last session
           </div>
         </div>
-      </section>
+      </Link>
 
-      <div className="mt-auto pt-6 flex justify-center">
+      <div className="mt-auto pt-6 flex justify-center gap-4 text-sm">
+        <Link
+          to="/history"
+          className="text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline"
+        >
+          History
+        </Link>
+        <span className="text-slate-600">·</span>
         <Link
           to="/settings"
-          className="text-sm text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline"
+          className="text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline"
         >
-          Settings & history
+          Settings
         </Link>
       </div>
     </div>

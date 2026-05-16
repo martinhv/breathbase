@@ -17,6 +17,7 @@ import { Session } from "@/pages/Session";
 import { Settings } from "@/pages/Settings";
 import { Onboarding } from "@/pages/Onboarding";
 import { Login } from "@/pages/Login";
+import { History } from "@/pages/History";
 
 function LoadingShell() {
   return (
@@ -57,6 +58,7 @@ function SignedInApp() {
         <Route path="/category/:id" element={<Category />} />
         <Route path="/session/:id" element={<Session />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/history" element={<History />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
