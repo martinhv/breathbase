@@ -6,22 +6,23 @@
 #
 # Run from repo root:
 #     ./scripts/generate-voice.sh                  # all voices
-#     ./scripts/generate-voice.sh aria jenny       # specific voices
+#     ./scripts/generate-voice.sh aria thomas      # specific voices
 #
 # To list available voices:
 #     edge-tts --list-voices | grep -i en-
 
 set -euo pipefail
 
-# id:edge-voice-name. Keep ids in sync with src/lib/voiceProfiles.ts.
+# Pipe-separated: id|edge-voice|rate|pitch.
+# Keep ids in sync with src/lib/voiceProfiles.ts.
 VOICES=(
-  "aria:en-US-AriaNeural"
-  "jenny:en-US-JennyNeural"
-  "guy:en-US-GuyNeural"
-  "libby:en-GB-LibbyNeural"
+  "aria|en-US-AriaNeural|-25%|+0Hz"
+  "jenny|en-US-JennyNeural|-25%|+0Hz"
+  "guy|en-US-GuyNeural|-25%|+0Hz"
+  "libby|en-GB-LibbyNeural|-25%|+0Hz"
+  "thomas|en-GB-ThomasNeural|-25%|-10Hz"
 )
 
-RATE="-25%"   # slower for guided breathwork
 OUT_ROOT="$(dirname "$0")/../public/voice"
 
 # slug → phrase. Keep slugs in sync with PROMPT_SLUGS in src/hooks/useSpeech.ts.
@@ -55,18 +56,17 @@ should_render() {
 }
 
 for entry in "${VOICES[@]}"; do
-  id="${entry%%:*}"
-  voice="${entry##*:}"
+  IFS='|' read -r id voice rate pitch <<< "$entry"
   if ! should_render "$id"; then continue; fi
 
   out_dir="$OUT_ROOT/$id"
   mkdir -p "$out_dir"
-  echo "=== $id ($voice) ==="
+  echo "=== $id ($voice, rate=$rate pitch=$pitch) ==="
   for slug in "${!PHRASES[@]}"; do
     phrase="${PHRASES[$slug]}"
     out="$out_dir/$slug.mp3"
     echo "  → $slug.mp3  ($phrase)"
-    edge-tts --voice "$voice" --text "$phrase" --rate="$RATE" --write-media "$out"
+    edge-tts --voice "$voice" --text "$phrase" --rate="$rate" --pitch="$pitch" --write-media "$out"
   done
 done
 

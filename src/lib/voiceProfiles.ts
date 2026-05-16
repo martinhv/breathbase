@@ -42,6 +42,12 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     description: "British English · soft",
     edgeVoice: "en-GB-LibbyNeural",
   },
+  {
+    id: "thomas",
+    name: "Thomas",
+    description: "British English · deep, male",
+    edgeVoice: "en-GB-ThomasNeural",
+  },
 ];
 
 export const DEFAULT_VOICE_PROFILE = "aria";
