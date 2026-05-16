@@ -10,6 +10,7 @@ import {
   type SessionEntry,
 } from "@/lib/storage";
 import { TECHNIQUES } from "@/lib/techniques";
+import { VOICE_PROFILES } from "@/lib/voiceProfiles";
 
 type ToggleProps = {
   label: string;
@@ -169,15 +170,43 @@ export function Settings() {
             onChange={(v) => update({ voiceEnabled: v })}
           />
           {settings.voiceEnabled && (
-            <div className="py-3 flex items-center justify-between gap-3">
-              <span className="text-slate-200">Preview voice</span>
-              <button
-                onClick={preview}
-                aria-label="Preview voice"
-                className="px-3 py-1 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/10"
-              >
-                Play
-              </button>
+            <div
+              role="radiogroup"
+              aria-label="Voice"
+              className="py-3 flex flex-col gap-2"
+            >
+              {VOICE_PROFILES.map((v) => {
+                const active = settings.voiceProfile === v.id;
+                return (
+                  <div
+                    key={v.id}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition ${
+                      active
+                        ? "bg-teal-400/10 border-teal-400/40"
+                        : "border-white/10 hover:bg-white/5"
+                    }`}
+                  >
+                    <button
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => update({ voiceProfile: v.id })}
+                      className="flex-1 text-left"
+                    >
+                      <div className="text-sm text-slate-200">{v.name}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {v.description}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => preview(v.id)}
+                      aria-label={`Preview ${v.name}`}
+                      className="px-3 py-1 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/10"
+                    >
+                      Play
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
           <Toggle

@@ -20,6 +20,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { DEFAULT_VOICE_PROFILE } from "./voiceProfiles";
 
 export type Mood = -2 | -1 | 0 | 1 | 2;
 
@@ -40,6 +41,8 @@ export type ReducedMotionPref = "auto" | "on" | "off";
 
 export type Settings = {
   voiceEnabled: boolean;
+  /** Voice profile id; see VOICE_PROFILES in voiceProfiles.ts. */
+  voiceProfile: string;
   musicEnabled: boolean;
   chimesEnabled: boolean;
   hapticsEnabled: boolean;
@@ -58,6 +61,7 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   voiceEnabled: true,
+  voiceProfile: DEFAULT_VOICE_PROFILE,
   musicEnabled: true,
   chimesEnabled: true,
   hapticsEnabled: true,

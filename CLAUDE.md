@@ -53,9 +53,15 @@ Timing is driven by a single `requestAnimationFrame` loop — never `setTimeout`
 
 `SettingsContext` / `useSettings()` exposes `{ settings, loading, update, reset }`. Settings load asynchronously from Firestore on sign-in; `loading` is true until the first fetch resolves. Writes are fire-and-forget through `saveSettings(uid, ...)` — UI state updates immediately, errors are logged. A `loadedUidRef` guards against writing to a previous user's doc if the active user changes mid-flight.
 
-### Voice prompts (`hooks/useSpeech.ts`)
+### Voice prompts (`hooks/useSpeech.ts` + `lib/voiceProfiles.ts`)
 
-Web Speech API is **not** used (Firefox/Linux defaults to eSpeak, which is robotic). Instead, every `voicePrompt` string in `techniques.ts` maps to a pre-rendered MP3 in `public/voice/` via the `PROMPT_FILE` table in `useSpeech.ts`. To add a new prompt: add it to `PROMPT_FILE`, add the matching slug to `scripts/generate-voice.sh`, run the script (requires `edge-tts`; `pip install edge-tts`), commit the new mp3. The service worker precaches all `*.mp3` so prompts work offline.
+Web Speech API is **not** used (Firefox/Linux defaults to eSpeak, which is robotic). Instead, every `voicePrompt` string maps to a slug via `PROMPT_SLUGS` in `useSpeech.ts`, and clips live at `public/voice/{profileId}/{slug}.mp3`. The active profile comes from `settings.voiceProfile`; available profiles are declared in `lib/voiceProfiles.ts`.
+
+To add a **new prompt**: add it to `PROMPT_SLUGS` and to the `PHRASES` array in `scripts/generate-voice.sh`, then run the script (requires `pip install edge-tts`) — it regenerates the slug for every voice profile.
+
+To add a **new voice**: append to `VOICE_PROFILES` in `voiceProfiles.ts` and add a matching `id:edge-voice-name` line to `VOICES` in `generate-voice.sh`, then run the script (optionally pass the new id as an arg to render only that one).
+
+The service worker precaches all `*.mp3`, so all voices are available offline after first load.
 
 ### Audio (`hooks/useAudioEngine.ts`)
 
