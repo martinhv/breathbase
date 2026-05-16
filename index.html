@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -19,8 +19,26 @@
       rel="stylesheet"
     />
     <title>BreathBase</title>
+    <script>
+      // Apply theme before React paints so we never flash the wrong palette.
+      // Mirrors src/lib/theme.ts (see applyTheme there); we duplicate the
+      // logic in HTML on purpose so the very first frame is correct.
+      (function () {
+        try {
+          var raw = localStorage.getItem("bb.theme");
+          var theme = raw === "light" || raw === "dark" || raw === "auto" ? raw : "auto";
+          var dark =
+            theme === "dark" ||
+            (theme === "auto" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (_) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-ink-950 text-slate-100">
+  <body class="bg-slate-50 text-slate-900 dark:bg-ink-950 dark:text-slate-100">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

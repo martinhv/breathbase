@@ -19,13 +19,13 @@ type ToggleProps = {
 };
 const Toggle = ({ label, checked, onChange }: ToggleProps) => (
   <label className="flex items-center justify-between py-3">
-    <span className="text-slate-200">{label}</span>
+    <span className="text-slate-800 dark:text-slate-200">{label}</span>
     <button
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative w-11 h-6 rounded-full transition ${
-        checked ? "bg-teal-400/80" : "bg-white/15"
+        checked ? "bg-teal-400/80" : "bg-slate-900/10 dark:bg-white/15"
       }`}
     >
       <span
@@ -57,8 +57,8 @@ const Slider = ({
 }: SliderProps) => (
   <label className="flex flex-col py-3 gap-2">
     <div className="flex items-baseline justify-between">
-      <span className="text-slate-200">{label}</span>
-      <span className="text-xs tabular-nums text-slate-400">
+      <span className="text-slate-800 dark:text-slate-200">{label}</span>
+      <span className="text-xs tabular-nums text-slate-600 dark:text-slate-400">
         {format ? format(value) : value}
       </span>
     </div>
@@ -87,24 +87,24 @@ type CollapseProps = {
 };
 const Collapse = ({ title, hint, defaultOpen = false, children }: CollapseProps) => (
   <details
-    className="group rounded-2xl bg-white/5 border border-white/10 overflow-hidden"
+    className="group rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 overflow-hidden"
     open={defaultOpen}
   >
-    <summary className="list-none cursor-pointer select-none flex items-center justify-between px-4 py-3 hover:bg-white/5">
+    <summary className="list-none cursor-pointer select-none flex items-center justify-between px-4 py-3 hover:bg-slate-900/[0.04] dark:hover:bg-white/5">
       <div className="flex items-baseline gap-3">
-        <span className="text-sm font-medium text-slate-200">{title}</span>
+        <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{title}</span>
         {hint && (
-          <span className="text-xs text-slate-400 truncate">{hint}</span>
+          <span className="text-xs text-slate-600 dark:text-slate-400 truncate">{hint}</span>
         )}
       </div>
       <span
         aria-hidden
-        className="text-slate-400 text-sm transition-transform group-open:rotate-90"
+        className="text-slate-600 dark:text-slate-400 text-sm transition-transform group-open:rotate-90"
       >
         ›
       </span>
     </summary>
-    <div className="px-4 pb-2 border-t border-white/5">{children}</div>
+    <div className="px-4 pb-2 border-t border-slate-900/5 dark:border-white/5">{children}</div>
   </details>
 );
 
@@ -177,7 +177,7 @@ export function Settings() {
         <Link
           to="/"
           aria-label="Back"
-          className="p-2 -ml-2 rounded-full hover:bg-white/5 text-slate-400"
+          className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-600 dark:text-slate-400"
         >
           ←
         </Link>
@@ -187,7 +187,7 @@ export function Settings() {
       {/* -- Account: small, always visible. Data ops hidden behind a collapse. */}
       {user && (
         <section className="mb-4">
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center gap-3">
+          <div className="rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 p-4 flex items-center gap-3">
             {user.photoURL ? (
               <img
                 src={user.photoURL}
@@ -196,17 +196,17 @@ export function Settings() {
                 className="w-10 h-10 rounded-full"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-slate-300">
+              <div className="w-10 h-10 rounded-full bg-slate-900/5 dark:bg-white/10 flex items-center justify-center text-slate-700 dark:text-slate-300">
                 {(user.displayName ?? user.email ?? "?").charAt(0).toUpperCase()}
               </div>
             )}
             <div className="flex-1 min-w-0">
               {user.displayName && (
-                <div className="text-sm text-slate-200 truncate">
+                <div className="text-sm text-slate-800 dark:text-slate-200 truncate">
                   {user.displayName}
                 </div>
               )}
-              <div className="text-xs text-slate-400 truncate">
+              <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
                 {user.email}
               </div>
             </div>
@@ -214,7 +214,7 @@ export function Settings() {
               onClick={() => {
                 if (confirm("Sign out?")) void signOut();
               }}
-              className="px-3 py-2 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/5"
+              className="px-3 py-2 rounded-lg border border-slate-900/10 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
             >
               Sign out
             </button>
@@ -224,7 +224,7 @@ export function Settings() {
 
       <div className="flex flex-col gap-3">
         {/* -- Guidance: voice on/off lives here visible; details collapse. */}
-        <section className="rounded-2xl bg-white/5 border border-white/10 px-4 divide-y divide-white/5">
+        <section className="rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 px-4 divide-y divide-white/5">
           <Toggle
             label="Voice prompts"
             checked={settings.voiceEnabled}
@@ -270,7 +270,7 @@ export function Settings() {
                     className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition ${
                       active
                         ? "bg-teal-400/10 border-teal-400/40"
-                        : "border-white/10 hover:bg-white/5"
+                        : "border-slate-900/10 dark:border-white/10 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
                     }`}
                   >
                     <button
@@ -279,15 +279,15 @@ export function Settings() {
                       onClick={() => update({ voiceProfile: v.id })}
                       className="flex-1 text-left"
                     >
-                      <div className="text-sm text-slate-200">{v.name}</div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-sm text-slate-800 dark:text-slate-200">{v.name}</div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400">
                         {v.description}
                       </div>
                     </button>
                     <button
                       onClick={() => preview(v.id)}
                       aria-label={`Preview ${v.name}`}
-                      className="px-3 py-1 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/10"
+                      className="px-3 py-1 rounded-lg border border-slate-900/10 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10"
                     >
                       Play
                     </button>
@@ -362,28 +362,51 @@ export function Settings() {
           </div>
         </Collapse>
 
-        <Collapse title="Display" hint={`Motion: ${settings.reducedMotion}`}>
-          <label className="flex items-center justify-between py-3">
-            <span className="text-slate-200">Reduce motion</span>
-            <select
-              value={settings.reducedMotion}
-              onChange={(e) =>
-                update({
-                  reducedMotion: e.target.value as "auto" | "on" | "off",
-                })
-              }
-              className="bg-ink-700 border border-white/10 rounded-lg px-2 py-1 text-sm text-slate-200"
-            >
-              <option value="auto">Auto (follow system)</option>
-              <option value="on">On</option>
-              <option value="off">Off</option>
-            </select>
-          </label>
+        <Collapse
+          title="Display"
+          hint={`${settings.theme} · motion ${settings.reducedMotion}`}
+        >
+          <div className="divide-y divide-slate-900/5 dark:divide-white/5">
+            <label className="flex items-center justify-between py-3">
+              <span className="text-slate-800 dark:text-slate-200">Theme</span>
+              <select
+                value={settings.theme}
+                onChange={(e) =>
+                  update({
+                    theme: e.target.value as "auto" | "light" | "dark",
+                  })
+                }
+                className="bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 rounded-lg px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
+              >
+                <option value="auto">Auto (follow system)</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+            <label className="flex items-center justify-between py-3">
+              <span className="text-slate-800 dark:text-slate-200">
+                Reduce motion
+              </span>
+              <select
+                value={settings.reducedMotion}
+                onChange={(e) =>
+                  update({
+                    reducedMotion: e.target.value as "auto" | "on" | "off",
+                  })
+                }
+                className="bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 rounded-lg px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
+              >
+                <option value="auto">Auto (follow system)</option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </label>
+          </div>
         </Collapse>
 
         <Collapse title="Test sound">
           <div className="py-3">
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
               Tap below to hear a sample chime and chord. If you hear nothing,
               check your system volume and that no other app is muting the tab.
             </p>
@@ -403,10 +426,10 @@ export function Settings() {
               <button
                 onClick={exportData}
                 disabled={exporting}
-                className="w-full flex items-center justify-between py-3 text-sm text-slate-200 hover:opacity-90 disabled:opacity-50"
+                className="w-full flex items-center justify-between py-3 text-sm text-slate-800 dark:text-slate-200 hover:opacity-90 disabled:opacity-50"
               >
                 <span>Export my data (JSON)</span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-600 dark:text-slate-400">
                   {exporting ? "Preparing…" : "Download"}
                 </span>
               </button>
@@ -428,7 +451,7 @@ export function Settings() {
       <section className="flex flex-col gap-2 mt-6 mb-6">
         <button
           onClick={() => setShowDisclaimer(true)}
-          className="px-4 py-3 rounded-2xl border border-white/10 text-slate-300 hover:bg-white/5 text-sm"
+          className="px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-sm"
         >
           View safety disclaimer
         </button>
@@ -436,13 +459,13 @@ export function Settings() {
           onClick={() => {
             if (confirm("Reset all settings to defaults?")) reset();
           }}
-          className="px-4 py-3 rounded-2xl border border-white/10 text-slate-400 hover:bg-white/5 text-sm"
+          className="px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-sm"
         >
           Reset settings
         </button>
       </section>
 
-      <footer className="text-center text-[11px] text-slate-400 leading-relaxed pt-2 pb-4">
+      <footer className="text-center text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed pt-2 pb-4">
         <a
           href={SOURCE_URL}
           target="_blank"

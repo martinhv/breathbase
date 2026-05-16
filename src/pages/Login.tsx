@@ -21,11 +21,11 @@ export function Login() {
         <div className="text-6xl">🌬️</div>
         <div>
           <h1 className="text-3xl font-light tracking-tight">BreathBase</h1>
-          <p className="text-sm text-slate-400 mt-2 max-w-xs">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 max-w-xs">
             Foundational breathwork, grounded in science.
           </p>
         </div>
-        <p className="text-slate-300 text-sm max-w-xs leading-relaxed">
+        <p className="text-slate-700 dark:text-slate-300 text-sm max-w-xs leading-relaxed">
           Sign in to sync your settings, streak, and practice history across
           devices.
         </p>
@@ -45,11 +45,11 @@ export function Login() {
             {error}
           </p>
         )}
-        <p className="text-[11px] text-slate-400 text-center max-w-xs mx-auto leading-relaxed">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center max-w-xs mx-auto leading-relaxed">
           By continuing you agree to use this app as an educational tool, not
           medical advice. See safety details after sign-in.
         </p>
-        <p className="text-[11px] text-slate-400 text-center pt-2">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center pt-2">
           Open source —{" "}
           <a
             href={SOURCE_URL}

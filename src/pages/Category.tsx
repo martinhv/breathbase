@@ -41,19 +41,19 @@ function TechniqueCard({ t }: { t: Technique }) {
   };
 
   return (
-    <article className="p-4 rounded-2xl bg-white/5 border border-white/10">
+    <article className="p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
       <header className="mb-2">
-        <h3 className="text-lg font-medium text-slate-100">{t.name}</h3>
+        <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">{t.name}</h3>
       </header>
-      <p className="text-sm text-slate-300 leading-relaxed">
+      <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
         {t.shortDescription}
       </p>
       <p className="text-xs text-teal-300/80 mt-2 leading-relaxed italic">
         {t.scientificRationale}
       </p>
       {expanded && (
-        <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-          <span className="uppercase tracking-widest text-slate-300">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">
+          <span className="uppercase tracking-widest text-slate-700 dark:text-slate-300">
             Citation:{" "}
           </span>
           {t.citation}
@@ -64,7 +64,7 @@ function TechniqueCard({ t }: { t: Technique }) {
         role="radiogroup"
         aria-label="Session length"
       >
-        <span className="text-[10px] uppercase tracking-widest text-slate-400 mr-1">
+        <span className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mr-1">
           Duration
         </span>
         {presets.map((mins) => {
@@ -78,7 +78,7 @@ function TechniqueCard({ t }: { t: Technique }) {
               className={`px-2.5 py-1 rounded-lg text-xs tabular-nums transition ${
                 active
                   ? "bg-teal-400/90 text-ink-950 font-medium"
-                  : "border border-white/10 text-slate-300 hover:bg-white/10"
+                  : "border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10"
               }`}
             >
               {mins}m
@@ -89,7 +89,7 @@ function TechniqueCard({ t }: { t: Technique }) {
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-white/10 border border-white/10"
+          className="px-3 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10 border border-slate-900/10 dark:border-white/10"
         >
           {expanded ? "Less" : "More"}
         </button>
@@ -118,7 +118,7 @@ export function Category() {
   const cat = id && (id as Cat) in CATEGORIES ? CATEGORIES[id as Cat] : null;
   if (!cat) {
     return (
-      <div className="p-6 text-center text-slate-400">
+      <div className="p-6 text-center text-slate-600 dark:text-slate-400">
         <p>Category not found.</p>
         <Link to="/" className="text-teal-300 underline">
           Back home
@@ -133,7 +133,7 @@ export function Category() {
         <Link
           to="/"
           aria-label="Back"
-          className="p-2 -ml-2 rounded-full hover:bg-white/5 text-slate-400"
+          className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-600 dark:text-slate-400"
         >
           ←
         </Link>
@@ -145,7 +145,7 @@ export function Category() {
         </div>
       </header>
 
-      <p className="text-sm text-slate-400 leading-relaxed mb-5">
+      <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-5">
         {cat.description}
       </p>
 

@@ -20,14 +20,14 @@ export function PhaseIndicator({ phase, remainingMs }: Props) {
       </div>
       <div
         aria-hidden
-        className="text-6xl sm:text-7xl font-extralight tabular-nums text-slate-100/90"
+        className="text-6xl sm:text-7xl font-extralight tabular-nums text-slate-900 dark:text-slate-100/90"
       >
         {seconds}
       </div>
       {phase.meta?.note && (
         <div
           aria-hidden
-          className="mt-1 text-sm text-slate-400/90 italic"
+          className="mt-1 text-sm text-slate-600 dark:text-slate-400/90 italic"
         >
           {phase.meta.note}
         </div>

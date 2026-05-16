@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider, useSettings } from "@/lib/settings";
+import { applyTheme, subscribeSystemTheme } from "@/lib/theme";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { Home } from "@/pages/Home";
@@ -22,7 +23,7 @@ import { History } from "@/pages/History";
 function LoadingShell() {
   return (
     <div className="min-h-full flex items-center justify-center safe-top safe-bottom">
-      <div className="text-slate-400 text-sm">Loading…</div>
+      <div className="text-slate-600 dark:text-slate-400 text-sm">Loading…</div>
     </div>
   );
 }
@@ -38,6 +39,15 @@ function SignedInApp() {
     const id = setTimeout(() => setHydrated(true), 0);
     return () => clearTimeout(id);
   }, [loading]);
+
+  // Keep the html.dark class in sync with settings.theme. The inline script
+  // in index.html handles the first paint; this hook handles changes after
+  // settings load from Firestore + system theme changes while in 'auto'.
+  useEffect(() => {
+    applyTheme(settings.theme);
+    if (settings.theme !== "auto") return;
+    return subscribeSystemTheme(() => applyTheme(settings.theme));
+  }, [settings.theme]);
 
   useEffect(() => {
     if (!hydrated) return;

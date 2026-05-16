@@ -45,7 +45,7 @@ export function Onboarding() {
       <div className="flex justify-end pt-2">
         <button
           onClick={skip}
-          className="text-sm text-slate-400 hover:text-slate-200"
+          className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
         >
           Skip
         </button>
@@ -63,7 +63,7 @@ export function Onboarding() {
           >
             <div className="text-6xl">{SLIDES[i].icon}</div>
             <h1 className="text-3xl font-light">{SLIDES[i].title}</h1>
-            <p className="text-slate-300 leading-relaxed max-w-xs">
+            <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-xs">
               {SLIDES[i].body}
             </p>
           </motion.div>
@@ -75,7 +75,7 @@ export function Onboarding() {
           <div
             key={idx}
             className={`h-1.5 rounded-full transition-all ${
-              idx === i ? "w-8 bg-teal-400" : "w-1.5 bg-white/20"
+              idx === i ? "w-8 bg-teal-400" : "w-1.5 bg-slate-900/10 dark:bg-white/20"
             }`}
           />
         ))}

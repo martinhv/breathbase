@@ -31,7 +31,7 @@ export function Session() {
   const technique = id ? findTechnique(id) : undefined;
   if (!technique) {
     return (
-      <div className="p-6 text-center text-slate-400 safe-top safe-bottom">
+      <div className="p-6 text-center text-slate-600 dark:text-slate-400 safe-top safe-bottom">
         <p>Technique not found.</p>
         <Link to="/" className="text-teal-300 underline">
           Back home
@@ -169,7 +169,7 @@ function SessionInner({ technique }: { technique: Technique }) {
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <div className="text-5xl">✨</div>
           <h1 className="text-3xl font-light">Session complete</h1>
-          <div className="text-sm text-slate-400">
+          <div className="text-sm text-slate-600 dark:text-slate-400">
             <p>{technique.name}</p>
             <p>
               {formatTime(session.totalElapsedMs)} •{" "}
@@ -206,12 +206,12 @@ function SessionInner({ technique }: { technique: Technique }) {
         <button
           onClick={() => setShowCloseConfirm(true)}
           aria-label="Close session"
-          className="p-2 -ml-2 rounded-full hover:bg-white/5 text-slate-300"
+          className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-700 dark:text-slate-300"
         >
           ✕
         </button>
-        <div className="text-slate-300 font-medium">{technique.name}</div>
-        <div className="tabular-nums text-slate-400 w-12 text-right">
+        <div className="text-slate-700 dark:text-slate-300 font-medium">{technique.name}</div>
+        <div className="tabular-nums text-slate-600 dark:text-slate-400 w-12 text-right">
           {formatTime(session.totalElapsedMs)}
         </div>
       </header>
@@ -220,13 +220,13 @@ function SessionInner({ technique }: { technique: Technique }) {
       <main className="flex-1 flex flex-col items-center justify-center gap-8">
         {isReady ? (
           <div className="text-center">
-            <div className="text-sm uppercase tracking-widest text-slate-400 mb-2">
+            <div className="text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">
               Get ready
             </div>
             <div className="text-7xl font-extralight tabular-nums">
               {Math.max(1, Math.ceil(session.readyRemainingMs / 1000))}
             </div>
-            <p className="mt-4 text-slate-400 text-sm max-w-xs mx-auto">
+            <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm max-w-xs mx-auto">
               Take a slow, deep breath. Settle in.
             </p>
           </div>
@@ -250,7 +250,7 @@ function SessionInner({ technique }: { technique: Technique }) {
 
       {/* Bottom controls */}
       <footer className="mt-4 flex flex-col gap-3">
-        <div className="flex justify-between text-xs text-slate-400 uppercase tracking-widest">
+        <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 uppercase tracking-widest">
           {session.totalRounds > 1 ? (
             <span>
               Round {session.currentRound} of {session.totalRounds}
@@ -266,13 +266,13 @@ function SessionInner({ technique }: { technique: Technique }) {
           <button
             onClick={isPaused ? session.resume : session.pause}
             disabled={isReady}
-            className="flex-1 px-4 py-3 rounded-2xl bg-white/10 border border-white/10 text-slate-100 hover:bg-white/15 disabled:opacity-40"
+            className="flex-1 px-4 py-3 rounded-2xl bg-slate-900/5 dark:bg-white/10 border border-slate-900/10 dark:border-white/10 text-slate-900 dark:text-slate-100 hover:bg-slate-900/10 dark:hover:bg-white/15 disabled:opacity-40"
           >
             {isPaused ? "Resume" : "Pause"}
           </button>
           <button
             onClick={session.skipToEnd}
-            className="flex-1 px-4 py-3 rounded-2xl border border-white/10 text-slate-300 hover:bg-white/5"
+            className="flex-1 px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
           >
             Skip to end
           </button>
@@ -286,14 +286,14 @@ function SessionInner({ technique }: { technique: Technique }) {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-6"
         >
-          <div className="w-full max-w-sm bg-ink-800 border border-white/10 rounded-3xl p-6">
-            <p className="text-slate-200 mb-4">
+          <div className="w-full max-w-sm bg-white dark:bg-ink-800 border border-slate-900/10 dark:border-white/10 rounded-3xl p-6">
+            <p className="text-slate-800 dark:text-slate-200 mb-4">
               End this session? Your progress will not be saved.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCloseConfirm(false)}
-                className="flex-1 px-4 py-3 rounded-2xl border border-white/10"
+                className="flex-1 px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10"
               >
                 Stay
               </button>

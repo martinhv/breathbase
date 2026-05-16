@@ -19,7 +19,7 @@ export function NostrilDiagram({ nostril }: Props) {
         viewBox="0 0 120 120"
         width="96"
         height="96"
-        className="text-slate-200"
+        className="text-slate-800 dark:text-slate-200"
       >
         {/* Face */}
         <circle
@@ -65,7 +65,7 @@ export function NostrilDiagram({ nostril }: Props) {
           opacity="0.85"
         />
       </svg>
-      <div className="text-xs uppercase tracking-widest text-slate-400">
+      <div className="text-xs uppercase tracking-widest text-slate-600 dark:text-slate-400">
         Open: {nostril}
       </div>
     </div>

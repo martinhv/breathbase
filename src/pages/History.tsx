@@ -64,7 +64,7 @@ export function History() {
         <Link
           to="/"
           aria-label="Back"
-          className="p-2 -ml-2 rounded-full hover:bg-white/5 text-slate-400"
+          className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-600 dark:text-slate-400"
         >
           ←
         </Link>
@@ -72,21 +72,21 @@ export function History() {
       </header>
 
       <section className="grid grid-cols-3 gap-3 text-center mb-6">
-        <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+        <div className="p-3 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
           <div className="text-2xl font-light tabular-nums">{streak}</div>
-          <div className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">
+          <div className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mt-1">
             day streak
           </div>
         </div>
-        <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+        <div className="p-3 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
           <div className="text-2xl font-light tabular-nums">{minutes}</div>
-          <div className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">
+          <div className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mt-1">
             minutes
           </div>
         </div>
-        <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+        <div className="p-3 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
           <div className="text-2xl font-light tabular-nums">{sessions}</div>
-          <div className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">
+          <div className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mt-1">
             sessions
           </div>
         </div>
@@ -109,7 +109,7 @@ export function History() {
               className={`px-3 py-1 rounded-lg text-xs transition ${
                 active
                   ? "bg-teal-400/90 text-ink-950 font-medium"
-                  : "border border-white/10 text-slate-300 hover:bg-white/10"
+                  : "border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10"
               }`}
             >
               {label}
@@ -119,9 +119,9 @@ export function History() {
       </section>
 
       {history === null ? (
-        <p className="text-slate-400 text-sm">Loading…</p>
+        <p className="text-slate-600 dark:text-slate-400 text-sm">Loading…</p>
       ) : filtered.length === 0 ? (
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-600 dark:text-slate-400 text-sm">
           {filter === "all"
             ? "No sessions yet."
             : `No ${CATEGORIES[filter as Category].title.toLowerCase()} sessions yet.`}
@@ -130,18 +130,18 @@ export function History() {
         <div className="flex flex-col gap-4">
           {grouped.map(([day, entries]) => (
             <div key={day}>
-              <h2 className="text-[10px] uppercase tracking-widest text-slate-400 mb-2">
+              <h2 className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">
                 {day}
               </h2>
-              <div className="rounded-2xl bg-white/5 border border-white/10 divide-y divide-white/5">
+              <div className="rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 divide-y divide-white/5">
                 {entries.map((h) => (
                   <div
                     key={h.id ?? h.startedAt}
                     className="flex items-center justify-between px-4 py-3 text-sm"
                   >
                     <div>
-                      <div className="text-slate-200">{h.techniqueName}</div>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-slate-800 dark:text-slate-200">{h.techniqueName}</div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
                         {new Date(h.startedAt).toLocaleTimeString(undefined, {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -150,7 +150,7 @@ export function History() {
                         <span className="capitalize">{h.category}</span>
                       </div>
                     </div>
-                    <div className="text-xs text-slate-300 tabular-nums">
+                    <div className="text-xs text-slate-700 dark:text-slate-300 tabular-nums">
                       {Math.round(h.durationMs / 60000)}m
                     </div>
                   </div>
