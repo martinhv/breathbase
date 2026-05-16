@@ -9,21 +9,41 @@ import {
 import { useSettings } from "@/lib/settings";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 
+/**
+ * A handful of round-number duration choices within the technique's allowed
+ * range — always includes the min, the default, and the max so users can
+ * quickly pick the shortest, recommended, or longest version.
+ */
+function durationPresets(t: Technique): number[] {
+  const [min, max] = t.durationRangeMin;
+  const set = new Set<number>([min, t.defaultDurationMin, max]);
+  for (const v of [3, 5, 10]) {
+    if (v >= min && v <= max) set.add(v);
+  }
+  return Array.from(set)
+    .sort((a, b) => a - b)
+    .slice(0, 5);
+}
+
 function TechniqueCard({ t }: { t: Technique }) {
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const audio = useAudioEngine();
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
   const duration =
     settings.durationOverrides[t.id] ?? t.defaultDurationMin;
+  const presets = durationPresets(t);
+
+  const setDuration = (mins: number) => {
+    update({
+      durationOverrides: { ...settings.durationOverrides, [t.id]: mins },
+    });
+  };
 
   return (
     <article className="p-4 rounded-2xl bg-white/5 border border-white/10">
-      <header className="flex items-baseline justify-between gap-3 mb-2">
+      <header className="mb-2">
         <h3 className="text-lg font-medium text-slate-100">{t.name}</h3>
-        <div className="text-xs text-slate-400 whitespace-nowrap">
-          {duration} min
-        </div>
       </header>
       <p className="text-sm text-slate-300 leading-relaxed">
         {t.shortDescription}
@@ -39,7 +59,34 @@ function TechniqueCard({ t }: { t: Technique }) {
           {t.citation}
         </p>
       )}
-      <div className="mt-4 flex gap-2">
+      <div
+        className="mt-4 flex items-center gap-1.5 flex-wrap"
+        role="radiogroup"
+        aria-label="Session length"
+      >
+        <span className="text-[10px] uppercase tracking-widest text-slate-400 mr-1">
+          Duration
+        </span>
+        {presets.map((mins) => {
+          const active = duration === mins;
+          return (
+            <button
+              key={mins}
+              role="radio"
+              aria-checked={active}
+              onClick={() => setDuration(mins)}
+              className={`px-2.5 py-1 rounded-lg text-xs tabular-nums transition ${
+                active
+                  ? "bg-teal-400/90 text-ink-950 font-medium"
+                  : "border border-white/10 text-slate-300 hover:bg-white/10"
+              }`}
+            >
+              {mins}m
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex gap-2">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-white/10 border border-white/10"
@@ -59,7 +106,7 @@ function TechniqueCard({ t }: { t: Technique }) {
           }}
           className="ml-auto px-5 py-2 rounded-xl bg-teal-400/90 text-ink-950 text-sm font-medium hover:bg-teal-300"
         >
-          Begin
+          Begin · {duration}m
         </button>
       </div>
     </article>
