@@ -10,6 +10,7 @@ import {
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider, useSettings } from "@/lib/settings";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
+import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { Home } from "@/pages/Home";
 import { Category } from "@/pages/Category";
 import { Session } from "@/pages/Session";
@@ -20,7 +21,7 @@ import { Login } from "@/pages/Login";
 function LoadingShell() {
   return (
     <div className="min-h-full flex items-center justify-center safe-top safe-bottom">
-      <div className="text-slate-500 text-sm">Loading…</div>
+      <div className="text-slate-400 text-sm">Loading…</div>
     </div>
   );
 }
@@ -92,6 +93,7 @@ export default function App() {
       <BrowserRouter>
         <AuthGate />
       </BrowserRouter>
+      <ReloadPrompt />
     </AuthProvider>
   );
 }

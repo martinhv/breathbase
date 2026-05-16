@@ -185,6 +185,35 @@ class AudioEngineImpl {
   }
 
   /**
+   * Smoothly fade music to silence over `seconds`, then release the piano
+   * voices. Used at session completion so the harmony doesn't cut abruptly.
+   * Idempotent — calling during an in-flight fade just resets the target.
+   */
+  fadeOutMusic(seconds = 1.5): void {
+    if (!this.musicPlaying) return;
+    const v = this.pianoVolume;
+    if (!v) {
+      this.stopMusic();
+      return;
+    }
+    this.musicPlaying = false;
+    // Ramp piano channel to silence, then release any voices and restore the
+    // settings-driven volume so the next session starts at the right level.
+    v.volume.cancelScheduledValues(Tone.now());
+    v.volume.rampTo(-Infinity, seconds);
+    const restoreDb = this.settings.musicEnabled
+      ? linearToDb(this.settings.musicVolume)
+      : -Infinity;
+    window.setTimeout(
+      () => {
+        this.piano?.releaseAll();
+        if (this.pianoVolume) this.pianoVolume.volume.value = restoreDb;
+      },
+      Math.ceil(seconds * 1000) + 50,
+    );
+  }
+
+  /**
    * Play a musical phrase tightly aligned to the given breath phase.
    * Called from Session.tsx's `onPhaseEnter` so the rhythm of the music IS
    * the rhythm of the breath.

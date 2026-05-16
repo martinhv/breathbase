@@ -32,8 +32,8 @@ function TechniqueCard({ t }: { t: Technique }) {
         {t.scientificRationale}
       </p>
       {expanded && (
-        <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-          <span className="uppercase tracking-widest text-slate-400">
+        <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+          <span className="uppercase tracking-widest text-slate-300">
             Citation:{" "}
           </span>
           {t.citation}

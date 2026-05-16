@@ -201,7 +201,7 @@ export function Settings() {
                       className="flex-1 text-left"
                     >
                       <div className="text-sm text-slate-200">{v.name}</div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-[11px] text-slate-400">
                         {v.description}
                       </div>
                     </button>
@@ -366,7 +366,7 @@ export function Settings() {
               >
                 <div>
                   <div className="text-slate-200">{h.techniqueName}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-slate-400">
                     {new Date(h.startedAt).toLocaleString()}
                   </div>
                 </div>
@@ -396,7 +396,7 @@ export function Settings() {
         </button>
       </section>
 
-      <footer className="text-center text-[11px] text-slate-500 leading-relaxed pt-2 pb-4">
+      <footer className="text-center text-[11px] text-slate-400 leading-relaxed pt-2 pb-4">
         <a
           href={SOURCE_URL}
           target="_blank"

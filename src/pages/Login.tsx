@@ -45,11 +45,11 @@ export function Login() {
             {error}
           </p>
         )}
-        <p className="text-[11px] text-slate-500 text-center max-w-xs mx-auto leading-relaxed">
+        <p className="text-[11px] text-slate-400 text-center max-w-xs mx-auto leading-relaxed">
           By continuing you agree to use this app as an educational tool, not
           medical advice. See safety details after sign-in.
         </p>
-        <p className="text-[11px] text-slate-500 text-center pt-2">
+        <p className="text-[11px] text-slate-400 text-center pt-2">
           Open source —{" "}
           <a
             href={SOURCE_URL}

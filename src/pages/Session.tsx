@@ -8,6 +8,7 @@ import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { useBreathSession, type ExpandedPhase } from "@/hooks/useBreathSession";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useSpeech } from "@/hooks/useSpeech";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import { useSettings } from "@/lib/settings";
 import { useAuth } from "@/lib/auth";
 import { appendHistory } from "@/lib/storage";
@@ -89,12 +90,15 @@ function SessionInner({ technique }: { technique: Technique }) {
     onPhaseEnter,
     onStartRunning,
     onComplete: () => {
-      audio.stopMusic();
+      audio.fadeOutMusic(2);
       cancelSpeech();
       vibrate([80, 60, 80]);
       setStage("complete");
     },
   });
+
+  // Keep the screen on while the user is actively breathing along.
+  useWakeLock(stage === "active");
   const sessionRef = useRef(session);
   sessionRef.current = session;
 

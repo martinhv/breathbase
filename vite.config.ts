@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" so a new build doesn't silently swap the SW under a user
+      // mid-session. The ReloadPrompt component (src/components/) shows a
+      // small banner and the user taps to apply the update.
+      registerType: "prompt",
       includeAssets: ["favicon.svg", "icon-512.svg", "voice/*.mp3"],
       workbox: {
         // Precache pre-rendered voice clips so the app is fully offline.
