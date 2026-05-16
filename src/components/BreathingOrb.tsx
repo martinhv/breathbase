@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import type { PhaseKind } from "@/lib/techniques";
+import type { Category, PhaseKind } from "@/lib/techniques";
 
 // Target scales per phase kind. inhale → fully expanded, exhale → contracted,
 // hold_in/hold_out → freeze at the prior extreme. The actual freeze is
@@ -13,34 +13,74 @@ const SCALE: Record<PhaseKind, number> = {
   hold_out: 0.32,
 };
 
-// Color per phase kind. Cool blue for inhale, warm amber for holds (the
-// "still" moments), deeper blue for exhale.
-const COLOR: Record<PhaseKind, string> = {
-  inhale: "#60a5fa", // sky-400
-  hold_in: "#fbbf24", // amber-400
-  exhale: "#3b82f6", // blue-500
-  hold_out: "#f59e0b", // amber-500
+// Base color per phase kind. Categories shift the hue family below to give
+// each practice a recognisable identity.
+type Palette = Record<PhaseKind, string>;
+
+const PALETTES: Record<Category, Palette> = {
+  downregulate: {
+    // Cool blues + deeper indigo holds — sleep-leaning palette.
+    inhale: "#60a5fa", // sky-400
+    hold_in: "#818cf8", // indigo-400
+    exhale: "#3b82f6", // blue-500
+    hold_out: "#6366f1", // indigo-500
+  },
+  upregulate: {
+    // Warm energy — amber/orange for inhale, red/orange for the holds.
+    inhale: "#fbbf24", // amber-400
+    hold_in: "#f97316", // orange-500
+    exhale: "#f59e0b", // amber-500
+    hold_out: "#ea580c", // orange-600
+  },
+  balance: {
+    // Teal-leaning, symmetric. Matches the brand accent.
+    inhale: "#2dd4bf", // teal-400
+    hold_in: "#5eead4", // teal-300
+    exhale: "#14b8a6", // teal-500
+    hold_out: "#5eead4",
+  },
+  focus: {
+    // Violet/indigo, attention-anchoring.
+    inhale: "#a78bfa", // violet-400
+    hold_in: "#c4b5fd", // violet-300
+    exhale: "#8b5cf6", // violet-500
+    hold_out: "#c4b5fd",
+  },
 };
 
 type Props = {
   phaseKind: PhaseKind;
   durationMs: number;
+  /** Drives the colour palette. */
+  category: Category;
+  /**
+   * Box breathing uses a literal square that scales 4-4-4-4 — the shape
+   * reinforces the rhythm. Everything else stays a circle.
+   */
+  shape?: "circle" | "square";
   /** When true (or paused), the orb stops animating to current scale. */
   paused?: boolean;
 };
 
-export function BreathingOrb({ phaseKind, durationMs, paused }: Props) {
+export function BreathingOrb({
+  phaseKind,
+  durationMs,
+  category,
+  shape = "circle",
+  paused,
+}: Props) {
   const reducedMotion = useReducedMotion();
   const targetScale = SCALE[phaseKind];
-  const targetColor = COLOR[phaseKind];
+  const targetColor = PALETTES[category][phaseKind];
   const durationSec = durationMs / 1000;
+  const rounded = shape === "square" ? "rounded-3xl" : "rounded-full";
 
   if (reducedMotion) {
     // Reduced-motion path: keep the orb a constant size, pulse opacity only.
     return (
       <div className="relative flex items-center justify-center">
         <motion.div
-          className="rounded-full"
+          className={rounded}
           aria-hidden
           style={{
             width: 240,
@@ -66,7 +106,7 @@ export function BreathingOrb({ phaseKind, durationMs, paused }: Props) {
       {/* Outer soft glow follows scale with extra blur for atmosphere. */}
       <motion.div
         aria-hidden
-        className="absolute rounded-full"
+        className={`absolute ${rounded}`}
         style={{
           width: 320,
           height: 320,
@@ -81,7 +121,7 @@ export function BreathingOrb({ phaseKind, durationMs, paused }: Props) {
       />
       {/* Main orb. */}
       <motion.div
-        className="rounded-full"
+        className={rounded}
         role="img"
         aria-label={`Breathing orb, ${phaseKind.replace("_", " ")}`}
         style={{ width: 240, height: 240 }}
@@ -94,7 +134,7 @@ export function BreathingOrb({ phaseKind, durationMs, paused }: Props) {
       {/* Subtle inner highlight for depth. */}
       <motion.div
         aria-hidden
-        className="absolute rounded-full pointer-events-none"
+        className={`absolute ${rounded} pointer-events-none`}
         style={{
           width: 240,
           height: 240,

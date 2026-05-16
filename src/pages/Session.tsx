@@ -235,6 +235,8 @@ function SessionInner({ technique }: { technique: Technique }) {
             <BreathingOrb
               phaseKind={phase.kind}
               durationMs={phase.durationMs}
+              category={technique.category}
+              shape={technique.id === "box-breathing" ? "square" : "circle"}
               paused={isPaused}
             />
             <PhaseIndicator

@@ -11,10 +11,26 @@ export default defineConfig({
       // mid-session. The ReloadPrompt component (src/components/) shows a
       // small banner and the user taps to apply the update.
       registerType: "prompt",
-      includeAssets: ["favicon.svg", "icon-512.svg", "voice/*.mp3"],
+      includeAssets: ["favicon.svg", "icon-512.svg"],
       workbox: {
-        // Precache pre-rendered voice clips so the app is fully offline.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,mp3}"],
+        // Voice mp3s are *not* precached — that would force every user to
+        // download all 5 voices' worth of clips (~1.5MB) on first visit.
+        // Instead they're cached at runtime as the active voice plays them.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith("/voice/"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "bb-voice-clips",
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
       manifest: {
         name: "BreathBase",
@@ -39,6 +55,24 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Pull the three heaviest dependencies into their own chunks so the
+        // browser can fetch them in parallel with the main app code, and so
+        // updates that only touch our source don't bust their cache.
+        manualChunks: {
+          firebase: [
+            "firebase/app",
+            "firebase/auth",
+            "firebase/firestore",
+          ],
+          tone: ["tone"],
+          framer: ["framer-motion"],
+        },
+      },
     },
   },
 });
