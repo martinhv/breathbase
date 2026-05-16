@@ -4,25 +4,19 @@ import { BreathingOrb } from "@/components/BreathingOrb";
 import { PhaseIndicator } from "@/components/PhaseIndicator";
 import { NostrilDiagram } from "@/components/NostrilDiagram";
 import { SafetyModal } from "@/components/SafetyModal";
-import { MoodCheckIn } from "@/components/MoodCheckIn";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { useBreathSession, type ExpandedPhase } from "@/hooks/useBreathSession";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useSettings } from "@/lib/settings";
 import { useAuth } from "@/lib/auth";
-import {
-  appendHistory,
-  type Mood,
-  updateMood,
-} from "@/lib/storage";
+import { appendHistory } from "@/lib/storage";
 import { findTechnique, type Technique } from "@/lib/techniques";
 
 type Stage =
   | "safety" // safety modal (only if technique has safetyNotes)
   | "active" // ready countdown + session
-  | "complete" // "Session complete" summary
-  | "mood"; // mood check-in
+  | "complete"; // "Session complete" summary
 
 function formatTime(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -117,11 +111,8 @@ function SessionInner({ technique }: { technique: Technique }) {
     }
   }, [stage, session.status, beginSession]);
 
-  // When the user enters complete stage, write a history entry. We keep the
-  // returned doc ID so the mood check-in can attach to *this* session rather
-  // than guessing at "the latest" (which would race if two devices sync).
+  // When the user enters complete stage, write a history entry.
   const historyWritten = useRef(false);
-  const sessionIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (stage !== "complete") return;
     if (historyWritten.current || !technique || !user) return;
@@ -135,14 +126,10 @@ function SessionInner({ technique }: { technique: Technique }) {
       ).toISOString(),
       durationMs: sessionRef.current.totalElapsedMs,
       cyclesCompleted: sessionRef.current.cyclesCompleted,
-    })
-      .then((id) => {
-        sessionIdRef.current = id;
-      })
-      .catch((e) => {
-        // eslint-disable-next-line no-console
-        console.error("Failed to save session:", e);
-      });
+    }).catch((e) => {
+      // eslint-disable-next-line no-console
+      console.error("Failed to save session:", e);
+    });
   }, [stage, technique, user]);
 
   // Cleanup audio on unmount.
@@ -171,7 +158,7 @@ function SessionInner({ technique }: { technique: Technique }) {
     );
   }
 
-  // ── COMPLETE / MOOD ─────────────────────────────────────────────────────
+  // ── COMPLETE ────────────────────────────────────────────────────────────
   if (stage === "complete") {
     return (
       <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto text-center">
@@ -188,28 +175,11 @@ function SessionInner({ technique }: { technique: Technique }) {
           </div>
         </div>
         <button
-          onClick={() => setStage("mood")}
+          onClick={() => navigate("/", { replace: true })}
           className="px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
-          Continue
+          Done
         </button>
-      </div>
-    );
-  }
-
-  if (stage === "mood") {
-    const finish = (mood: Mood | null) => {
-      if (mood !== null && user && sessionIdRef.current) {
-        updateMood(user.uid, sessionIdRef.current, mood).catch((e) => {
-          // eslint-disable-next-line no-console
-          console.error("Failed to save mood:", e);
-        });
-      }
-      navigate("/", { replace: true });
-    };
-    return (
-      <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto justify-center">
-        <MoodCheckIn onSubmit={(m) => finish(m)} onSkip={() => finish(null)} />
       </div>
     );
   }

@@ -17,12 +17,9 @@ import {
   orderBy,
   query,
   setDoc,
-  updateDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { DEFAULT_VOICE_PROFILE } from "./voiceProfiles";
-
-export type Mood = -2 | -1 | 0 | 1 | 2;
 
 export type SessionEntry = {
   /** Firestore document ID (omitted on write; populated on read). */
@@ -33,7 +30,6 @@ export type SessionEntry = {
   startedAt: string; // ISO 8601
   durationMs: number;
   cyclesCompleted: number;
-  mood?: Mood;
 };
 
 export type Theme = "dark" | "light" | "auto";
@@ -115,21 +111,8 @@ export const loadHistory = async (uid: string): Promise<SessionEntry[]> => {
 export const appendHistory = async (
   uid: string,
   entry: Omit<SessionEntry, "id">,
-): Promise<string> => {
-  // Use a client-generated ID so callers can immediately reference the entry
-  // (e.g. to attach mood after the check-in) without a round-trip.
-  const ref = doc(sessionsCol(uid));
-  await setDoc(ref, entry);
-  return ref.id;
-};
-
-/** Attach a mood rating to an existing session entry. */
-export const updateMood = async (
-  uid: string,
-  sessionId: string,
-  mood: Mood,
 ): Promise<void> => {
-  await updateDoc(doc(sessionsCol(uid), sessionId), { mood });
+  await setDoc(doc(sessionsCol(uid)), entry);
 };
 
 // ---------------------------------------------------------------------------
