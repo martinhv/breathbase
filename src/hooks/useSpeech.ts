@@ -34,16 +34,21 @@ const PROMPT_SLUGS: Record<string, string> = {
 
 const PREVIEW_SLUG = "preview";
 const MAX_COUNT = 15;
-const COUNT_VOLUME_RATIO = 0.6; // counts play at 60% of voiceVolume
+
+// Counts are *also* baked at 0.5x amplitude with a bandpass filter at
+// generate time (see scripts/generate-voice.sh) for an airy whisper-ish
+// quality. The JS-side ratio stacks on top to give counts ~30% of the
+// action prompt's perceived volume.
+const COUNT_VOLUME_RATIO = 0.6;
 
 /** Don't bother counting on phases shorter than this. */
 const COUNT_MIN_PHASE_MS = 3000;
 
 /** Safety margin between the end of the action prompt and the first count. */
-const POST_ACTION_GAP_MS = 250;
+const POST_ACTION_GAP_MS = 150;
 
 /** Fallback if we don't yet have the measured duration for a clip. */
-const FALLBACK_ACTION_DURATION_MS = 1500;
+const FALLBACK_ACTION_DURATION_MS = 1200;
 
 const clipUrl = (profileId: string, slug: string): string =>
   `/voice/${profileId}/${slug}.mp3`;
