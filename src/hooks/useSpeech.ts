@@ -1,120 +1,105 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useSettings } from "@/lib/settings";
 
-/**
- * SpeechSynthesis wrapper. Calm defaults (rate 0.75, pitch 0.8) and an
- * auto-pick heuristic that prefers neural / cloud voices over the robotic
- * eSpeak default that ships with Linux Chrome.
- *
- * Cancels any pending utterance before speaking so phase prompts don't pile
- * up if cycles are short.
- */
+// Pre-rendered voice prompts.
+//
+// Why not Web Speech API? On Firefox + Linux the default voice is eSpeak,
+// which is robotic and clashes with the calm-ambient feel of the app.
+// Quality also varies wildly across browsers, OSes, and installed voices.
+//
+// Since every prompt in techniques.ts comes from a fixed vocabulary of
+// ~14 strings, we ship pre-rendered MP3s (Microsoft Aria, generated via
+// scripts/generate-voice.sh) and play them with HTMLAudioElement. The
+// PWA service worker caches them so they're available offline after the
+// first load.
+//
+// To add a new voice prompt:
+//   1. Add an entry to PROMPT_FILE below.
+//   2. Add the same slug → text mapping in scripts/generate-voice.sh.
+//   3. Run ./scripts/generate-voice.sh and commit the new mp3.
 
-const RATE = 0.75;
-const PITCH = 0.8;
+const PROMPT_FILE: Record<string, string> = {
+  "Breathe in": "/voice/breathe-in.mp3",
+  "Breathe out": "/voice/breathe-out.mp3",
+  Hold: "/voice/hold.mp3",
+  "Top up": "/voice/top-up.mp3",
+  "Long exhale": "/voice/long-exhale.mp3",
+  In: "/voice/in.mp3",
+  Out: "/voice/out.mp3",
+  "Empty the lungs": "/voice/empty-the-lungs.mp3",
+  "Inhale left": "/voice/inhale-left.mp3",
+  "Exhale right": "/voice/exhale-right.mp3",
+  "Inhale right": "/voice/inhale-right.mp3",
+  "Exhale left": "/voice/exhale-left.mp3",
+  Settle: "/voice/settle.mp3",
+  Rest: "/voice/rest.mp3",
+};
 
-/** Score a voice — higher is better. */
-function scoreVoice(v: SpeechSynthesisVoice): number {
-  const name = v.name.toLowerCase();
-  let score = 0;
-  // Microsoft neural voices (Edge / Windows 11) are top-tier.
-  if (name.includes("natural")) score += 100;
-  if (name.includes("neural")) score += 100;
-  // Google's cloud voices on Chrome.
-  if (name.includes("google")) score += 80;
-  // Known Apple system voices.
-  if (/\b(samantha|karen|daniel|moira|fiona|tessa|allison|tom|alex|ava|serena|nicky)\b/.test(name))
-    score += 70;
-  // Cloud-backed voices are almost always better than locally synthesized ones.
-  if (!v.localService) score += 30;
-  // Prefer English locales for the English prompts we use.
-  if (v.lang.startsWith("en")) score += 15;
-  // Penalize known robotic engines.
-  if (name.includes("espeak")) score -= 80;
-  if (name === "english") score -= 40; // generic eSpeak entries
-  // Slight preference for voices typically perceived as calmer in guided
-  // breathwork contexts. Subjective; users can always override.
-  if (/\b(female|woman|aria|jenny|samantha|karen|moira|ava|serena)\b/.test(name))
-    score += 5;
-  return score;
-}
-
-function pickBestVoice(
-  voices: SpeechSynthesisVoice[],
-): SpeechSynthesisVoice | null {
-  if (voices.length === 0) return null;
-  return [...voices].sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
-}
+const PREVIEW_FILE = "/voice/preview.mp3";
 
 export function useSpeech() {
   const { settings } = useSettings();
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
+  // A single Audio element reused for every prompt. We could pool one per
+  // file, but at our cycle rates a fresh play() on the same element is
+  // simpler and keeps memory flat.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  if (audioRef.current === null && typeof window !== "undefined") {
+    audioRef.current = new Audio();
+    audioRef.current.preload = "auto";
+  }
+
+  // Keep volume in sync without re-creating the element.
   useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    const sync = () => setVoices(window.speechSynthesis.getVoices());
-    sync();
-    // Chrome populates voices asynchronously.
-    window.speechSynthesis.addEventListener("voiceschanged", sync);
-    return () =>
-      window.speechSynthesis.removeEventListener("voiceschanged", sync);
+    if (audioRef.current) {
+      audioRef.current.volume = Math.max(
+        0,
+        Math.min(1, settings.voiceVolume),
+      );
+    }
+  }, [settings.voiceVolume]);
+
+  const playFile = useCallback((src: string) => {
+    const el = audioRef.current;
+    if (!el) return;
+    // If the same prompt is already mid-play (rare but possible on quick
+    // skip), reset to start rather than waiting for it to finish.
+    el.pause();
+    el.currentTime = 0;
+    if (el.src !== window.location.origin + src && !el.src.endsWith(src)) {
+      el.src = src;
+    }
+    // play() returns a promise that rejects if interrupted; swallow it so
+    // a quick phase-change doesn't surface a console error.
+    void el.play().catch(() => {});
   }, []);
-
-  /** The voice that will be used when the user hasn't explicitly chosen one. */
-  const preferredVoice = useMemo(() => pickBestVoice(voices), [voices]);
-
-  const resolveVoice = useCallback(
-    (override?: string | null): SpeechSynthesisVoice | null => {
-      const target = override !== undefined ? override : settings.voiceURI;
-      if (target) {
-        const found = voices.find((v) => v.voiceURI === target);
-        if (found) return found;
-      }
-      return preferredVoice;
-    },
-    [settings.voiceURI, voices, preferredVoice],
-  );
 
   const speak = useCallback(
     (text: string) => {
       if (!settings.voiceEnabled) return;
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = RATE;
-      u.pitch = PITCH;
-      u.volume = Math.max(0, Math.min(1, settings.voiceVolume));
-      const chosen = resolveVoice();
-      if (chosen) u.voice = chosen;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
+      const src = PROMPT_FILE[text];
+      if (!src) {
+        // Unknown phrase — silently skip. Adding a new voicePrompt without
+        // a corresponding clip is the only way this happens; the bash
+        // generator script enforces parity at build-time-ish.
+        return;
+      }
+      playFile(src);
     },
-    [settings.voiceEnabled, settings.voiceVolume, resolveVoice],
+    [settings.voiceEnabled, playFile],
   );
 
   const cancel = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    const el = audioRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
   }, []);
 
-  /**
-   * Speak a fixed preview phrase. `voiceURI === null` previews the
-   * auto-picked default. `voiceURI === undefined` previews the user's
-   * currently-saved selection.
-   */
-  const preview = useCallback(
-    (voiceURI?: string | null) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
-      const u = new SpeechSynthesisUtterance("Breathe in. Hold. Breathe out.");
-      u.rate = RATE;
-      u.pitch = PITCH;
-      u.volume = Math.max(0, Math.min(1, settings.voiceVolume));
-      const chosen = resolveVoice(voiceURI ?? null);
-      if (chosen) u.voice = chosen;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    },
-    [settings.voiceVolume, resolveVoice],
-  );
+  const preview = useCallback(() => {
+    playFile(PREVIEW_FILE);
+  }, [playFile]);
 
-  return { speak, cancel, preview, voices, preferredVoice };
+  return { speak, cancel, preview };
 }

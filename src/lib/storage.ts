@@ -40,7 +40,6 @@ export type ReducedMotionPref = "auto" | "on" | "off";
 
 export type Settings = {
   voiceEnabled: boolean;
-  voiceURI: string | null;
   musicEnabled: boolean;
   chimesEnabled: boolean;
   hapticsEnabled: boolean;
@@ -59,7 +58,6 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   voiceEnabled: true,
-  voiceURI: null,
   musicEnabled: true,
   chimesEnabled: true,
   hapticsEnabled: true,

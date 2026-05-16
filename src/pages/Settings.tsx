@@ -76,7 +76,7 @@ const Slider = ({
 export function Settings() {
   const { settings, update, reset } = useSettings();
   const { user, signOut } = useAuth();
-  const { voices, preferredVoice, preview } = useSpeech();
+  const { preview } = useSpeech();
   const audio = useAudioEngine();
   const [history, setHistory] = useState<SessionEntry[]>([]);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -168,43 +168,16 @@ export function Settings() {
             checked={settings.voiceEnabled}
             onChange={(v) => update({ voiceEnabled: v })}
           />
-          {settings.voiceEnabled && voices.length > 0 && (
-            <div className="py-3 flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-slate-200">Voice</span>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={settings.voiceURI ?? ""}
-                    onChange={(e) =>
-                      update({ voiceURI: e.target.value || null })
-                    }
-                    className="bg-ink-700 border border-white/10 rounded-lg px-2 py-1 text-sm text-slate-200 max-w-[45vw]"
-                  >
-                    <option value="">
-                      Auto
-                      {preferredVoice ? ` — ${preferredVoice.name}` : ""}
-                    </option>
-                    {voices.map((v) => (
-                      <option key={v.voiceURI} value={v.voiceURI}>
-                        {v.name} ({v.lang})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => preview(settings.voiceURI ?? null)}
-                    aria-label="Preview voice"
-                    className="px-3 py-1 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/10"
-                  >
-                    Preview
-                  </button>
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                "Auto" picks the most natural-sounding voice your browser
-                offers. On Linux Chrome that may still be eSpeak; installing
-                Microsoft Edge or a Chrome voice extension adds higher-quality
-                voices system-wide.
-              </p>
+          {settings.voiceEnabled && (
+            <div className="py-3 flex items-center justify-between gap-3">
+              <span className="text-slate-200">Preview voice</span>
+              <button
+                onClick={preview}
+                aria-label="Preview voice"
+                className="px-3 py-1 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/10"
+              >
+                Play
+              </button>
             </div>
           )}
           <Toggle

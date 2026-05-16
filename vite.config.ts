@@ -8,7 +8,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icon-512.svg"],
+      includeAssets: ["favicon.svg", "icon-512.svg", "voice/*.mp3"],
+      workbox: {
+        // Precache pre-rendered voice clips so the app is fully offline.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,mp3}"],
+      },
       manifest: {
         name: "BreathBase",
         short_name: "BreathBase",

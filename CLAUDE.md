@@ -53,6 +53,10 @@ Timing is driven by a single `requestAnimationFrame` loop — never `setTimeout`
 
 `SettingsContext` / `useSettings()` exposes `{ settings, loading, update, reset }`. Settings load asynchronously from Firestore on sign-in; `loading` is true until the first fetch resolves. Writes are fire-and-forget through `saveSettings(uid, ...)` — UI state updates immediately, errors are logged. A `loadedUidRef` guards against writing to a previous user's doc if the active user changes mid-flight.
 
+### Voice prompts (`hooks/useSpeech.ts`)
+
+Web Speech API is **not** used (Firefox/Linux defaults to eSpeak, which is robotic). Instead, every `voicePrompt` string in `techniques.ts` maps to a pre-rendered MP3 in `public/voice/` via the `PROMPT_FILE` table in `useSpeech.ts`. To add a new prompt: add it to `PROMPT_FILE`, add the matching slug to `scripts/generate-voice.sh`, run the script (requires `edge-tts`; `pip install edge-tts`), commit the new mp3. The service worker precaches all `*.mp3` so prompts work offline.
+
 ### Audio (`hooks/useAudioEngine.ts`)
 
 Tone.js is lazy-initialized on the user's first gesture (browser autoplay policy). The ambient pad is a `PolySynth` (C2+G2+D3+A3) through a low-pass with a slow LFO and 12 s reverb. Chimes are a sine `Synth` fired on `onPhaseEnter`; default frequencies per phase kind are in `DEFAULT_CHIME_HZ` in `techniques.ts` and can be overridden per-phase via `chimeFreqHz`.
