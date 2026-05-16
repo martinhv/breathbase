@@ -1,8 +1,14 @@
+import { useEffect, useState } from "react";
+
 type Props = {
   open: boolean;
   onAcknowledge: () => void;
   onClose?: () => void;
-  /** When true, acknowledgment is required (no dismiss button). */
+  /**
+   * When true, acknowledgment is required: the dialog can't be dismissed,
+   * and the user must explicitly check the consent box before the
+   * acknowledge button enables.
+   */
   required?: boolean;
 };
 
@@ -12,7 +18,17 @@ export function DisclaimerModal({
   onClose,
   required,
 }: Props) {
+  const [consented, setConsented] = useState(false);
+
+  // Reset the checkbox each time the modal opens so a previously-checked
+  // state doesn't auto-accept a reopened modal.
+  useEffect(() => {
+    if (open) setConsented(false);
+  }, [open]);
+
   if (!open) return null;
+  const canAcknowledge = !required || consented;
+
   return (
     <div
       role="dialog"
@@ -44,6 +60,24 @@ export function DisclaimerModal({
             or a history of seizures.
           </p>
         </div>
+
+        {required && (
+          <label className="mt-5 flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={consented}
+              onChange={(e) => setConsented(e.target.checked)}
+              className="mt-0.5 w-5 h-5 accent-teal-400 shrink-0"
+              aria-describedby="disclaimer-title"
+            />
+            <span className="text-sm text-slate-200 leading-snug">
+              I have read and understood the safety information above. I
+              accept that BreathBase is an educational tool, not medical
+              advice, and I practice at my own risk.
+            </span>
+          </label>
+        )}
+
         <div className="mt-6 flex gap-3">
           {!required && onClose && (
             <button
@@ -55,9 +89,10 @@ export function DisclaimerModal({
           )}
           <button
             onClick={onAcknowledge}
-            className="flex-1 px-4 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
+            disabled={!canAcknowledge}
+            className="flex-1 px-4 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            I understand
+            {required ? "I accept" : "I understand"}
           </button>
         </div>
       </div>
