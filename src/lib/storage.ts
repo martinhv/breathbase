@@ -10,6 +10,7 @@
 
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -17,6 +18,7 @@ import {
   orderBy,
   query,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { DEFAULT_VOICE_PROFILE } from "./voiceProfiles";
@@ -151,3 +153,60 @@ export const totalMinutes = (history: SessionEntry[]): number =>
 
 export const lastSession = (history: SessionEntry[]): SessionEntry | null =>
   history[0] ?? null;
+
+// ---------------------------------------------------------------------------
+// Export + delete (GDPR-style data portability and erasure)
+// ---------------------------------------------------------------------------
+
+/** Snapshot of everything we have for a user. Returned as plain JSON. */
+export const exportAllUserData = async (
+  uid: string,
+): Promise<{
+  exportedAt: string;
+  uid: string;
+  settings: Settings | null;
+  sessions: SessionEntry[];
+}> => {
+  const [settingsSnap, sessionsSnap] = await Promise.all([
+    getDoc(settingsDoc(uid)),
+    getDocs(
+      query(sessionsCol(uid), orderBy("startedAt", "desc"), limit(10_000)),
+    ),
+  ]);
+  return {
+    exportedAt: new Date().toISOString(),
+    uid,
+    settings: settingsSnap.exists() ? (settingsSnap.data() as Settings) : null,
+    sessions: sessionsSnap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<SessionEntry, "id">),
+    })),
+  };
+};
+
+/**
+ * Delete every Firestore document under users/{uid}. The Firebase Auth user
+ * record is handled separately (see auth.tsx's deleteAccount) because that
+ * requires a recent re-auth on the client SDK.
+ */
+export const deleteAllUserData = async (uid: string): Promise<void> => {
+  const sessionsSnap = await getDocs(sessionsCol(uid));
+  if (!sessionsSnap.empty) {
+    // writeBatch caps at 500 ops; chunk if a user somehow has >500 sessions.
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const d of sessionsSnap.docs) {
+      batch.delete(d.ref);
+      count += 1;
+      if (count >= 500) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+    if (count > 0) await batch.commit();
+  }
+  await deleteDoc(settingsDoc(uid)).catch(() => {
+    // The settings doc may not exist yet for brand-new users; treat as no-op.
+  });
+};

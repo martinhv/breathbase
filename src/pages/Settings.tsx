@@ -6,6 +6,7 @@ import { useSpeech } from "@/hooks/useSpeech";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import {
+  exportAllUserData,
   loadHistory,
   type SessionEntry,
 } from "@/lib/storage";
@@ -77,12 +78,14 @@ const Slider = ({
 
 export function Settings() {
   const { settings, update, reset } = useSettings();
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
   const { preview } = useSpeech();
   const audio = useAudioEngine();
   const [history, setHistory] = useState<SessionEntry[]>([]);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -105,6 +108,50 @@ export function Settings() {
     await audio.testSound();
     // testSound's chord plays for ~2.2s; let the button reflect that.
     window.setTimeout(() => setTesting(false), 2500);
+  };
+
+  const exportData = async () => {
+    if (!user) return;
+    setExporting(true);
+    try {
+      const data = await exportAllUserData(user.uid);
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `breathbase-export-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("Export failed:", e);
+      alert("Export failed. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const onDeleteAccount = async () => {
+    if (!user) return;
+    const ok = confirm(
+      "Delete your account and all session history? This cannot be undone.",
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      // AuthGate will swap to the Login screen once the user object goes null.
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("Delete failed:", e);
+      alert("Account deletion failed. Please try again.");
+      setDeleting(false);
+    }
   };
 
   return (
@@ -155,6 +202,28 @@ export function Settings() {
               className="px-3 py-2 rounded-lg border border-white/10 text-xs text-slate-300 hover:bg-white/5"
             >
               Sign out
+            </button>
+          </div>
+          <div className="mt-2 rounded-2xl bg-white/5 border border-white/10 divide-y divide-white/5">
+            <button
+              onClick={exportData}
+              disabled={exporting}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-50"
+            >
+              <span>Export my data (JSON)</span>
+              <span className="text-xs text-slate-400">
+                {exporting ? "Preparing…" : "Download"}
+              </span>
+            </button>
+            <button
+              onClick={onDeleteAccount}
+              disabled={deleting}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm text-red-300/90 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              <span>Delete account and all data</span>
+              <span className="text-xs text-red-300/70">
+                {deleting ? "Deleting…" : "Permanent"}
+              </span>
             </button>
           </div>
         </section>
