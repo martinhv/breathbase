@@ -1,30 +1,30 @@
 import { Link, useParams } from "react-router-dom";
-import {
-  CATEGORIES,
-  techniquesByCategory,
-  type Category as Cat,
-} from "@/lib/techniques";
+import { THEMES, type ThemeId } from "@/lib/themes";
+import { findTechnique } from "@/lib/techniques";
 import { TechniqueCard } from "@/components/TechniqueCard";
 
-export function Category() {
+export function Theme() {
   const { id } = useParams<{ id: string }>();
-  const cat = id && (id as Cat) in CATEGORIES ? CATEGORIES[id as Cat] : null;
-  if (!cat) {
+  const theme = id && (id as ThemeId) in THEMES ? THEMES[id as ThemeId] : null;
+  if (!theme) {
     return (
-      <div className="p-6 text-center text-slate-600 dark:text-slate-400">
-        <p>Category not found.</p>
-        <Link to="/library" className="text-teal-300 underline">
-          Back to library
+      <div className="p-6 text-center text-slate-600 dark:text-slate-400 safe-top safe-bottom">
+        <p>Theme not found.</p>
+        <Link to="/" className="text-teal-300 underline">
+          Back home
         </Link>
       </div>
     );
   }
-  const techniques = techniquesByCategory(cat.id);
+  const techniques = theme.techniqueIds
+    .map((tid) => findTechnique(tid))
+    .filter((t): t is NonNullable<typeof t> => !!t);
+
   return (
     <div className="min-h-full safe-top safe-bottom px-5 pb-6 max-w-md mx-auto">
       <header className="pt-4 pb-5 flex items-center gap-3">
         <Link
-          to="/library"
+          to="/"
           aria-label="Back"
           className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-600 dark:text-slate-400"
         >
@@ -32,14 +32,14 @@ export function Category() {
         </Link>
         <div>
           <div className="text-xs uppercase tracking-widest text-slate-500">
-            {cat.emoji} {cat.tagline}
+            {theme.emoji} {theme.tagline}
           </div>
-          <h1 className="text-2xl font-light">{cat.title}</h1>
+          <h1 className="text-2xl font-light">{theme.name}</h1>
         </div>
       </header>
 
       <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-5">
-        {cat.description}
+        {theme.description}
       </p>
 
       <div className="flex flex-col gap-3">

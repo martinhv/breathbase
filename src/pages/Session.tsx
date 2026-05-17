@@ -56,8 +56,8 @@ function SessionInner({ technique }: { technique: Technique }) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
 
-  // If we're launched from a 7-day program (e.g. `?program=3`), and that
-  // day's prescribed technique matches the one we're running, use the
+  // If we're launched from the Foundations program (e.g. `?program=3`), and
+  // that day's prescribed technique matches the one we're running, use the
   // program's duration — not the user's per-technique override. This keeps
   // the "guided" feel: the program decides the dose.
   const programDay = useMemo(() => {
@@ -65,10 +65,10 @@ function SessionInner({ technique }: { technique: Technique }) {
     if (!raw) return null;
     const n = Number(raw);
     if (!Number.isFinite(n)) return null;
-    const day = getProgramDay(settings.program.programId, n);
+    const day = getProgramDay(n);
     if (!day) return null;
     return day.techniqueId === technique.id ? day : null;
-  }, [searchParams, technique.id, settings.program.programId]);
+  }, [searchParams, technique.id]);
 
   const duration = useMemo(() => {
     if (programDay) return programDay.durationMin;

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CategoryCard } from "@/components/CategoryCard";
-import { CATEGORIES, CATEGORY_ORDER } from "@/lib/techniques";
 import {
   computeStreak,
   lastSession,
@@ -12,11 +10,13 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
 import {
-  getProgram,
+  PROGRAM,
+  PROGRAM_LENGTH,
   getProgramDay,
   isProgramComplete,
   nextProgramDay,
 } from "@/lib/program";
+import { THEMES, THEME_ORDER } from "@/lib/themes";
 
 function formatRelative(iso: string): string {
   const d = new Date(iso);
@@ -35,16 +35,16 @@ function ProgramTile() {
     return (
       <Link
         to="/program"
-        className="block mb-3 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 hover:bg-slate-900/5 dark:hover:bg-white/10 transition"
+        className="block mb-4 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 hover:bg-slate-900/5 dark:hover:bg-white/10 transition"
       >
         <div className="flex items-center gap-3">
-          <div className="text-2xl">🗓️</div>
+          <div className="text-2xl">{PROGRAM.emoji}</div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              Try the 7-day program
+              Start the {PROGRAM.name} program
             </div>
             <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
-              A different foundational practice each day.
+              A different foundational practice each day for a week.
             </div>
           </div>
           <div className="text-slate-500 dark:text-slate-400">→</div>
@@ -53,41 +53,59 @@ function ProgramTile() {
     );
   }
 
-  const selected = getProgram(program.programId);
   const complete = isProgramComplete(program);
   const next = nextProgramDay(program);
-  const day = next != null ? getProgramDay(program.programId, next) : null;
+  const day = next != null ? getProgramDay(next) : null;
   const doneCount = program.completedDays.length;
-  const length = selected.days.length;
 
   return (
     <Link
       to="/program"
-      className="block mb-3 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 hover:bg-slate-900/5 dark:hover:bg-white/10 transition"
+      className="block mb-4 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 hover:bg-slate-900/5 dark:hover:bg-white/10 transition"
     >
       <div className="flex items-center gap-3">
-        <div className="text-2xl">{selected.emoji}</div>
+        <div className="text-2xl">{PROGRAM.emoji}</div>
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-widest text-teal-300/80">
             {complete
-              ? `${selected.name} · complete`
-              : `${selected.name} · day ${next} of ${length}`}
+              ? `${PROGRAM.name} · complete`
+              : `${PROGRAM.name} · day ${next} of ${PROGRAM_LENGTH}`}
           </div>
           <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
             {complete
-              ? "Pick another program"
+              ? "Seven days finished"
               : (day?.headline ?? "Continue program")}
           </div>
         </div>
         <div className="text-xs text-slate-600 dark:text-slate-400 tabular-nums">
-          {doneCount}/{length}
+          {doneCount}/{PROGRAM_LENGTH}
         </div>
       </div>
       <div className="h-1 rounded-full bg-slate-900/10 dark:bg-white/10 mt-3 overflow-hidden">
         <div
           className="h-full bg-teal-400/90 transition-all"
-          style={{ width: `${(doneCount / length) * 100}%` }}
+          style={{ width: `${(doneCount / PROGRAM_LENGTH) * 100}%` }}
         />
+      </div>
+    </Link>
+  );
+}
+
+function ThemeCard({ themeId }: { themeId: keyof typeof THEMES }) {
+  const t = THEMES[themeId];
+  return (
+    <Link
+      to={`/theme/${t.id}`}
+      className="group flex flex-col justify-between aspect-square p-5 rounded-3xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 hover:bg-slate-900/5 dark:hover:bg-white/10 active:bg-slate-900/10 dark:active:bg-white/15 transition shadow-lg"
+    >
+      <div className="text-4xl">{t.emoji}</div>
+      <div>
+        <div className="text-lg font-medium text-slate-900 dark:text-slate-100">
+          {t.name}
+        </div>
+        <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-snug">
+          {t.tagline}
+        </div>
       </div>
     </Link>
   );
@@ -124,26 +142,34 @@ export function Home() {
         </p>
       </header>
 
-      <section className="mb-6 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
-        <div className="text-xs uppercase tracking-widest text-teal-300/80 mb-1">
-          Foundational level
-        </div>
-        <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
-          You're building awareness, relaxation, and basic breath control.
-          Start with 5 minutes a day — consistency matters more than duration.
-        </p>
-      </section>
-
       <ProgramTile />
 
       <section
-        aria-label="Categories"
-        className="grid grid-cols-2 gap-3 mb-6"
+        aria-label="Themes"
+        className="grid grid-cols-2 gap-3 mb-4"
       >
-        {CATEGORY_ORDER.map((id) => (
-          <CategoryCard key={id} meta={CATEGORIES[id]} />
+        {THEME_ORDER.map((id) => (
+          <ThemeCard key={id} themeId={id} />
         ))}
       </section>
+
+      <Link
+        to="/library"
+        className="block mb-6 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 hover:bg-slate-900/5 dark:hover:bg-white/10 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="text-2xl">📚</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              Library
+            </div>
+            <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
+              Every technique, grouped by physiology.
+            </div>
+          </div>
+          <div className="text-slate-500 dark:text-slate-400">→</div>
+        </div>
+      </Link>
 
       <Link
         to="/history"
