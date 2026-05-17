@@ -45,18 +45,17 @@ const COUNT_VOLUME_RATIO = 1.0;
 const COUNT_MIN_PHASE_MS = 3000;
 
 /** Minimum silence between the end of the action prompt and the first count.
- *  Bumped up from 150 ms — count clips are ~1 s long and fire on a 1 s grid,
- *  so a count landing right after the action prompt felt crowded (the prompt
- *  + the count occupied the entire first 2 s of the phase with no breathing
- *  room). One full second of silence is now required first, which usually
- *  drops the highest two counts on long phases and leaves a clean countdown
- *  near the end. */
-const POST_ACTION_GAP_MS = 1000;
+ *  Keeps the first count from sounding crowded by the prompt. The hard work
+ *  of dropping "rushed" counts is mostly done by the overlap check below —
+ *  this gap just provides a small grace zone right after the prompt. */
+const POST_ACTION_GAP_MS = 600;
 
-/** Allowed slop when a count clip's tail extends past the next count's start.
- *  Tiny overhangs (under this) are imperceptible; anything more sounds like
- *  the announcer is rushing into the next number and the count is skipped. */
-const COUNT_OVERLAP_TOLERANCE_MS = 200;
+/** Allowed overhang when a count clip's tail extends past the next count's
+ *  start. Set to zero: if count-N is still talking when count-(N-1) is meant
+ *  to fire, drop count-N entirely. Count clips happen to run ~0.9–1.13 s
+ *  (longer than the 1 s grid), so without this rule the higher counts overlap
+ *  by ~30–130 ms and the announcer sounds like they're racing the clock. */
+const COUNT_OVERLAP_TOLERANCE_MS = 0;
 
 /** Fallback if we don't yet have the measured duration for a clip. */
 const FALLBACK_ACTION_DURATION_MS = 1200;
@@ -184,20 +183,35 @@ export function useSpeech() {
         Math.floor(durationMs / 1000) - 1,
       );
 
-      // For each remaining-second count n, fire at (durationMs - n*1000) ms
-      // after phase start. Skip ones that would either land during the action
-      // prompt or run too far past the slot of the next count — that's what
-      // produced the "rushed N" feeling on phases like belly-breathing's 6 s
-      // exhale (count-N clips are ~1 s but the gap to N-1 is exactly 1 s).
+      // Plan first, schedule second. For each remaining-second count n,
+      // fire at (durationMs - n*1000) ms after phase start. Skip ones that
+      // would either land during the action prompt or run too far past the
+      // slot of the next count — that's what produced the "rushed N" feeling
+      // on phases like belly-breathing's 6 s exhale (count clips are ~1 s
+      // but the gap to N-1 is exactly 1 s, so the higher counts overlap).
+      // The last count (n=1) skips the overlap check — there's no next count
+      // to crowd, and the trailing edge against the next phase's action
+      // prompt is intentional (acts as a handoff).
+      const planned: { n: number; fireAt: number }[] = [];
       for (let n = maxCount; n >= 1; n--) {
         const fireAt = durationMs - n * 1000;
         if (fireAt < earliestCountStartMs) continue;
         if (fireAt >= durationMs) continue;
-        const clipMs =
-          countDurationsRef.current.get(n) ?? FALLBACK_COUNT_DURATION_MS;
-        const nextEventMs =
-          n > 1 ? durationMs - (n - 1) * 1000 : durationMs;
-        if (fireAt + clipMs > nextEventMs + COUNT_OVERLAP_TOLERANCE_MS) continue;
+        if (n > 1) {
+          const clipMs =
+            countDurationsRef.current.get(n) ?? FALLBACK_COUNT_DURATION_MS;
+          const nextEventMs = durationMs - (n - 1) * 1000;
+          if (fireAt + clipMs > nextEventMs + COUNT_OVERLAP_TOLERANCE_MS)
+            continue;
+        }
+        planned.push({ n, fireAt });
+      }
+
+      // A lone count (just "one" at the end) reads as a random ping rather
+      // than a countdown — skip the whole thing if fewer than two would fire.
+      if (planned.length < 2) return;
+
+      for (const { n, fireAt } of planned) {
         const handle = window.setTimeout(() => {
           const el = countAudiosRef.current[n - 1];
           if (!el) return;
