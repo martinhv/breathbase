@@ -1,6 +1,10 @@
 // AuthContext — wraps Firebase Auth with a tiny status-machine that the
 // rest of the app reads via `useAuth()`. The router uses `status` to decide
 // what to render (loading shell / login screen / actual app).
+//
+// In local mode (see firebase.ts) the FirebaseAuthProvider is swapped for a
+// LocalAuthProvider that synthesizes a signed-in "local user" so there's no
+// login flow and all per-user data is namespaced under that synthetic uid.
 
 import {
   createContext,
@@ -19,7 +23,7 @@ import {
   signOut as fbSignOut,
   type User,
 } from "firebase/auth";
-import { auth, googleProvider } from "./firebase";
+import { auth, googleProvider, localMode } from "./firebase";
 import { deleteAllUserData } from "./storage";
 
 export type AuthStatus = "loading" | "signedOut" | "signedIn";
@@ -32,7 +36,8 @@ type AuthContextValue = {
   /**
    * Wipe all of the current user's Firestore data and delete their Firebase
    * Auth account. If Firebase requires a recent login, this transparently
-   * triggers a re-auth popup and retries.
+   * triggers a re-auth popup and retries. In local mode this clears the
+   * locally-stored data — there's no auth account to delete.
    */
   deleteAccount: () => Promise<void>;
   error: string | null;
@@ -40,7 +45,18 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+/** Synthetic user for local mode. Only the fields the app actually reads
+ *  (uid, displayName, email, photoURL) are populated; the rest of the
+ *  Firebase User shape is unused and cast away. */
+export const LOCAL_UID = "local-user";
+const LOCAL_USER = {
+  uid: LOCAL_UID,
+  displayName: "Local user",
+  email: null,
+  photoURL: null,
+} as unknown as User;
+
+function FirebaseAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +123,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function LocalAuthProvider({ children }: { children: ReactNode }) {
+  const deleteAccount = useCallback(async () => {
+    await deleteAllUserData(LOCAL_UID);
+    // No auth account to remove; just reload so the in-memory state resets.
+    if (typeof window !== "undefined") window.location.reload();
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: LOCAL_USER,
+      status: "signedIn",
+      signInWithGoogle: async () => {
+        /* no-op in local mode */
+      },
+      signOut: async () => {
+        /* no-op in local mode */
+      },
+      deleteAccount,
+      error: null,
+    }),
+    [deleteAccount],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return localMode ? (
+    <LocalAuthProvider>{children}</LocalAuthProvider>
+  ) : (
+    <FirebaseAuthProvider>{children}</FirebaseAuthProvider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

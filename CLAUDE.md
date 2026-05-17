@@ -13,7 +13,9 @@ npm run lint      # tsc --noEmit (type-check only; no test suite)
 
 There are no automated tests. Type-checking (`npm run lint`) is the primary correctness gate.
 
-**Local env:** the app will not run without Firebase credentials. Copy `.env.example` → `.env.local` and fill in the six `VITE_FIREBASE_*` values from your Firebase web-app config. README has the full Firebase setup walkthrough (enable Google provider, Firestore rules).
+**Local env:** for production-like running, copy `.env.example` → `.env.local` and fill in the six `VITE_FIREBASE_*` values from your Firebase web-app config. README has the full Firebase setup walkthrough (enable Google provider, Firestore rules).
+
+**Local mode:** if `VITE_LOCAL_MODE=true` is set, **or** the `VITE_FIREBASE_*` env vars are all empty, the app skips Firebase entirely. A synthetic "local user" is signed in automatically (no Login screen) and settings/sessions persist to `window.localStorage` under `breathbase:local-user:*` keys. Useful for `npm run dev` on a fresh clone with zero setup, or offline-only testing. See `src/lib/firebase.ts` for the `localMode` flag — `storage.ts` and `auth.tsx` branch on it. Settings UI hides the sign-out button and relabels "Delete account" to "Clear local data".
 
 ## Architecture
 

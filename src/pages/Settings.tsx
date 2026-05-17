@@ -6,6 +6,7 @@ import { useSpeech } from "@/hooks/useSpeech";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { exportAllUserData, type Soundscape } from "@/lib/storage";
+import { localMode } from "@/lib/firebase";
 import { TECHNIQUES } from "@/lib/techniques";
 import { VOICE_PROFILES } from "@/lib/voiceProfiles";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
@@ -208,9 +209,10 @@ export function Settings() {
 
   const onDeleteAccount = async () => {
     if (!user) return;
-    const ok = confirm(
-      "Delete your account and all session history? This cannot be undone.",
-    );
+    const message = localMode
+      ? "Clear all locally-stored settings and session history? This cannot be undone."
+      : "Delete your account and all session history? This cannot be undone.";
+    const ok = confirm(message);
     if (!ok) return;
     setDeleting(true);
     try {
@@ -218,7 +220,11 @@ export function Settings() {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("Delete failed:", e);
-      alert("Account deletion failed. Please try again.");
+      alert(
+        localMode
+          ? "Could not clear local data. Please try again."
+          : "Account deletion failed. Please try again.",
+      );
       setDeleting(false);
     }
   };
@@ -259,17 +265,19 @@ export function Settings() {
                 </div>
               )}
               <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                {user.email}
+                {localMode ? "Data stays on this device" : user.email}
               </div>
             </div>
-            <button
-              onClick={() => {
-                if (confirm("Sign out?")) void signOut();
-              }}
-              className="px-3 py-2 rounded-lg border border-slate-900/10 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
-            >
-              Sign out
-            </button>
+            {!localMode && (
+              <button
+                onClick={() => {
+                  if (confirm("Sign out?")) void signOut();
+                }}
+                className="px-3 py-2 rounded-lg border border-slate-900/10 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -581,7 +589,9 @@ export function Settings() {
                 disabled={deleting}
                 className="w-full flex items-center justify-between py-3 text-sm text-red-300/90 hover:opacity-90 disabled:opacity-50"
               >
-                <span>Delete account and all data</span>
+                <span>
+                  {localMode ? "Clear local data" : "Delete account and all data"}
+                </span>
                 <span className="text-xs text-red-300/70">
                   {deleting ? "Deleting…" : "Permanent"}
                 </span>

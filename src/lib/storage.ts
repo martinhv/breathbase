@@ -1,12 +1,12 @@
-// Firestore-backed persistence for settings, session history, and derived
-// streak/total-minutes stats. All reads/writes are scoped to the currently
-// signed-in user's UID, so the caller must pass `uid`.
+// Per-user persistence for settings, session history, and derived stats.
+// All reads/writes are scoped to the caller-supplied UID.
 //
-//   /users/{uid}/profile/settings          ← single doc, Settings shape
-//   /users/{uid}/sessions/{auto-id}        ← one doc per completed session
+// Two backends, switched by the `localMode` flag in firebase.ts:
+//   - Firestore (production): /users/{uid}/profile/settings + sessions/*
+//   - localStorage (local mode): JSON blobs under `breathbase:{uid}:*`
 //
 // Stats (streak, totalMinutes, lastSession) remain pure functions over a
-// SessionEntry[] — they don't know about Firestore.
+// SessionEntry[] — they don't know about either backend.
 
 import {
   collection,
@@ -20,7 +20,7 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, localMode } from "./firebase";
 import { DEFAULT_VOICE_PROFILE } from "./voiceProfiles";
 import { DEFAULT_PROGRAM_STATE, type ProgramState } from "./program";
 
@@ -97,10 +97,52 @@ const settingsDoc = (uid: string) => doc(db, "users", uid, "profile", "settings"
 const sessionsCol = (uid: string) => collection(db, "users", uid, "sessions");
 
 // ---------------------------------------------------------------------------
+// localStorage adapter (local mode)
+// ---------------------------------------------------------------------------
+//
+// Keys: `breathbase:{uid}:settings` and `breathbase:{uid}:sessions`. Sessions
+// are stored as a single JSON array (newest first) — no need for the document
+// indexing Firestore provides at this scale.
+
+const LS_NS = "breathbase";
+const lsKey = (uid: string, kind: "settings" | "sessions") =>
+  `${LS_NS}:${uid}:${kind}`;
+
+const lsReadJson = <T>(key: string, fallback: T): T => {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw == null) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const lsWriteJson = (key: string, value: unknown): void => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Quota exceeded or storage disabled — swallow; data is non-critical.
+  }
+};
+
+const localLoadSettings = (uid: string): Settings => {
+  const data = lsReadJson<Partial<Settings>>(lsKey(uid, "settings"), {});
+  return {
+    ...DEFAULT_SETTINGS,
+    ...data,
+    program: { ...DEFAULT_PROGRAM_STATE, ...(data.program ?? {}) },
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
 
 export const loadSettings = async (uid: string): Promise<Settings> => {
+  if (localMode) return localLoadSettings(uid);
   const snap = await getDoc(settingsDoc(uid));
   if (!snap.exists()) return DEFAULT_SETTINGS;
   const data = snap.data() as Partial<Settings>;
@@ -114,6 +156,10 @@ export const loadSettings = async (uid: string): Promise<Settings> => {
 };
 
 export const saveSettings = async (uid: string, s: Settings): Promise<void> => {
+  if (localMode) {
+    lsWriteJson(lsKey(uid, "settings"), s);
+    return;
+  }
   await setDoc(settingsDoc(uid), s, { merge: true });
 };
 
@@ -122,6 +168,13 @@ export const saveSettings = async (uid: string, s: Settings): Promise<void> => {
 // ---------------------------------------------------------------------------
 
 export const loadHistory = async (uid: string): Promise<SessionEntry[]> => {
+  if (localMode) {
+    const list = lsReadJson<SessionEntry[]>(lsKey(uid, "sessions"), []);
+    return list
+      .slice()
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+      .slice(0, HISTORY_LIMIT);
+  }
   const q = query(
     sessionsCol(uid),
     orderBy("startedAt", "desc"),
@@ -135,6 +188,14 @@ export const appendHistory = async (
   uid: string,
   entry: Omit<SessionEntry, "id">,
 ): Promise<void> => {
+  if (localMode) {
+    const list = lsReadJson<SessionEntry[]>(lsKey(uid, "sessions"), []);
+    const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // Cap to 1000 to bound localStorage growth (well above the read cap).
+    const next = [{ id, ...entry }, ...list].slice(0, 1000);
+    lsWriteJson(lsKey(uid, "sessions"), next);
+    return;
+  }
   await setDoc(doc(sessionsCol(uid)), entry);
 };
 
@@ -188,6 +249,14 @@ export const exportAllUserData = async (
   settings: Settings | null;
   sessions: SessionEntry[];
 }> => {
+  if (localMode) {
+    return {
+      exportedAt: new Date().toISOString(),
+      uid,
+      settings: localLoadSettings(uid),
+      sessions: lsReadJson<SessionEntry[]>(lsKey(uid, "sessions"), []),
+    };
+  }
   const [settingsSnap, sessionsSnap] = await Promise.all([
     getDoc(settingsDoc(uid)),
     getDocs(
@@ -208,9 +277,20 @@ export const exportAllUserData = async (
 /**
  * Delete every Firestore document under users/{uid}. The Firebase Auth user
  * record is handled separately (see auth.tsx's deleteAccount) because that
- * requires a recent re-auth on the client SDK.
+ * requires a recent re-auth on the client SDK. In local mode this just
+ * clears the corresponding localStorage entries.
  */
 export const deleteAllUserData = async (uid: string): Promise<void> => {
+  if (localMode) {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(lsKey(uid, "settings"));
+      window.localStorage.removeItem(lsKey(uid, "sessions"));
+    } catch {
+      /* noop */
+    }
+    return;
+  }
   const sessionsSnap = await getDocs(sessionsCol(uid));
   if (!sessionsSnap.empty) {
     // writeBatch caps at 500 ops; chunk if a user somehow has >500 sessions.
