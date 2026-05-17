@@ -24,15 +24,25 @@ import { DEFAULT_CHIME_HZ, type PhaseKind } from "@/lib/techniques";
  *     increments. Phrase shapes consult `passIndex` to subtly re-voice the
  *     same harmony on each loop (skipping chord tones, octave shifts on
  *     accent notes), so longer sessions don't lock into a perceptible loop.
- *   - Three ambient layers sit underneath the piano on the same music bus:
- *       * pad      – a slow, filter-modulated triangle/sine bed that holds
- *                    the current chord between piano triggers (the biggest
- *                    contributor to "presence"; fills the silent moments)
- *       * air      – very quiet band-passed pink noise with a slow LFO on
- *                    the filter, giving organic motion (~-30 dB under piano)
- *       * bell     – a single FM bell that rings each time the progression
- *                    wraps. Sparse by design — marks completion of a full
- *                    8-chord journey, ~once every 1–2 min depending on cycle.
+ *   - A sustained ensemble sits underneath the piano on the same music bus
+ *     and re-voices on every chord change, with each instrument owning its
+ *     own register so the chord stacks instead of crowding:
+ *       * cello    – a single fat-saw bass note on the chord root, deep
+ *                    low-pass, very slow attack. Foundation between piano
+ *                    bass triggers (no audible gap in the bottom).
+ *       * pad      – warm fattriangle PolySynth playing the lower-mid
+ *                    chord tones. The "choir" — fills the harmonic middle.
+ *       * strings  – fatsawtooth PolySynth through chorus + filter LFO,
+ *                    playing the upper chord tones. The brightest layer;
+ *                    swells with each chord change like bowed strings.
+ *       * air      – very quiet band-passed pink noise; subliminal motion.
+ *       * bell     – sparse FM bell on each progression wrap (~1–2 min).
+ *       * snare    – brushed snare swell at round boundaries — fires only
+ *                    when crossing between active cycles and rest/roundEnd
+ *                    phases, so it appears only in rounds-layout techniques
+ *                    (energizing breath, bellows breath) where the shift
+ *                    between active hyperventilation and recovery is a real
+ *                    musical moment to mark.
  *   - A separate sine Synth still handles per-transition chimes.
  *
  * Lifecycle:
@@ -99,12 +109,28 @@ class AudioEngineImpl {
   private padVolume: Tone.Volume | null = null;
   /** Currently-held pad chord; we release these before triggering the next. */
   private padCurrentNotes: string[] = [];
+  private strings: Tone.PolySynth | null = null;
+  private stringsFilter: Tone.Filter | null = null;
+  private stringsLfo: Tone.LFO | null = null;
+  private stringsChorus: Tone.Chorus | null = null;
+  private stringsVolume: Tone.Volume | null = null;
+  private stringsCurrentNotes: string[] = [];
+  private cello: Tone.PolySynth | null = null;
+  private celloFilter: Tone.Filter | null = null;
+  private celloVolume: Tone.Volume | null = null;
+  private celloCurrentNote: string | null = null;
   private noise: Tone.Noise | null = null;
   private noiseFilter: Tone.Filter | null = null;
   private noiseLfo: Tone.LFO | null = null;
   private noiseVolume: Tone.Volume | null = null;
   private bell: Tone.FMSynth | null = null;
   private bellVolume: Tone.Volume | null = null;
+  private snare: Tone.NoiseSynth | null = null;
+  private snareFilter: Tone.Filter | null = null;
+  private snareVolume: Tone.Volume | null = null;
+  /** Tracks whether the previous phase was a cycle (vs. rest/roundEnd).
+   * Null until the first phase fires. Used to detect round boundaries. */
+  private lastWasCycle: boolean | null = null;
 
   private started = false;
   private musicPlaying = false;
@@ -120,11 +146,13 @@ class AudioEngineImpl {
    * Build the audio graph. Idempotent. Called from `unlock()` after
    * Tone.start() so all nodes are constructed against a running context.
    *
-   *   piano  → pianoVolume → reverb → master → destination
-   *   pad    → padFilter   → padVolume   ┐
-   *   noise  → noiseFilter → noiseVolume ┼─→ pianoVolume (shared music bus)
-   *   bell   →              → bellVolume ┘
-   *   chime  → chimeVolume → destination (bypasses music bus + reverb)
+   *   piano   → pianoVolume → reverb → master → destination
+   *   cello   → celloFilter   → celloVolume   ┐
+   *   pad     → padFilter     → padVolume     │
+   *   strings → chorus → sFilter → sVolume    ├─→ pianoVolume (music bus)
+   *   noise   → noiseFilter   → noiseVolume   │
+   *   bell    →                → bellVolume   ┘
+   *   chime   → chimeVolume → destination (bypasses music bus + reverb)
    */
   private buildGraph(): void {
     if (this.piano) return;
@@ -160,9 +188,24 @@ class AudioEngineImpl {
       },
     }).connect(this.pianoVolume);
 
-    // ── Pad layer ──────────────────────────────────────────────────────
-    // Warm, slow-attack triangle bed. Filter cutoff sweeps slowly via LFO
-    // so the timbre breathes even while the chord is held.
+    // ── Cello-bass layer ───────────────────────────────────────────────
+    // A single fat-saw note on the chord root, deeply low-passed. Sustains
+    // between piano bass triggers so the bottom never drops out.
+    this.celloVolume = new Tone.Volume(-16).connect(this.pianoVolume);
+    this.celloFilter = new Tone.Filter({
+      frequency: 450,
+      type: "lowpass",
+      Q: 1,
+    }).connect(this.celloVolume);
+    this.cello = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "fatsawtooth", count: 2, spread: 12 },
+      envelope: { attack: 3, decay: 1.2, sustain: 0.75, release: 6 },
+    }).connect(this.celloFilter);
+    this.cello.volume.value = -4;
+
+    // ── Pad layer (choir-like, mid register) ───────────────────────────
+    // Warm, slow-attack triangle bed playing the lower-mid chord tones.
+    // Filter cutoff sweeps slowly via LFO so the timbre breathes.
     this.padVolume = new Tone.Volume(-14).connect(this.pianoVolume);
     this.padFilter = new Tone.Filter({
       frequency: 700,
@@ -183,6 +226,38 @@ class AudioEngineImpl {
     // PolySynth's per-voice volume is a touch hot at default; tame it here.
     this.pad.volume.value = -6;
 
+    // ── Strings layer (upper register) ─────────────────────────────────
+    // Fat-saw PolySynth through chorus + filter LFO — gives an ensemble
+    // bowed-string character. Plays the top of the chord and swells with
+    // each chord change, the most audible "instrumentation" addition.
+    this.stringsVolume = new Tone.Volume(-20).connect(this.pianoVolume);
+    this.stringsChorus = new Tone.Chorus({
+      frequency: 0.6,
+      delayTime: 4,
+      depth: 0.5,
+      spread: 180,
+      wet: 0.4,
+    })
+      .connect(this.stringsVolume)
+      .start();
+    this.stringsFilter = new Tone.Filter({
+      frequency: 1400,
+      type: "lowpass",
+      Q: 0.7,
+    }).connect(this.stringsChorus);
+    this.stringsLfo = new Tone.LFO({
+      frequency: 0.05,
+      min: 900,
+      max: 2000,
+      type: "sine",
+    }).connect(this.stringsFilter.frequency);
+    this.stringsLfo.start();
+    this.strings = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "fatsawtooth", count: 3, spread: 28 },
+      envelope: { attack: 1.5, decay: 0.8, sustain: 0.75, release: 4 },
+    }).connect(this.stringsFilter);
+    this.strings.volume.value = -8;
+
     // ── Air layer ──────────────────────────────────────────────────────
     // Band-passed pink noise — adds organic "presence" without timbre.
     // Starts silenced; startMusic() fades it in.
@@ -201,6 +276,21 @@ class AudioEngineImpl {
     this.noiseLfo.start();
     this.noise = new Tone.Noise("pink").connect(this.noiseFilter);
     this.noise.start();
+
+    // ── Snare layer ────────────────────────────────────────────────────
+    // Brushed-snare swell. Pink noise through a band-pass for the "brush"
+    // character, with a slow attack + decay envelope so it crescendos and
+    // settles rather than cracking. Fires only at round boundaries.
+    this.snareVolume = new Tone.Volume(-18).connect(this.pianoVolume);
+    this.snareFilter = new Tone.Filter({
+      frequency: 3500,
+      type: "bandpass",
+      Q: 1.2,
+    }).connect(this.snareVolume);
+    this.snare = new Tone.NoiseSynth({
+      noise: { type: "pink" },
+      envelope: { attack: 0.6, decay: 1.4, sustain: 0, release: 0.5 },
+    }).connect(this.snareFilter);
 
     // ── Bell layer ─────────────────────────────────────────────────────
     // Sparse FM bell — rings once per full progression pass.
@@ -228,27 +318,109 @@ class AudioEngineImpl {
     }).connect(this.chimeVolume);
   }
 
-  /** Attack the next chord on the pad, releasing the previous one. The pad
-   *  envelope's long release overlaps the new attack, producing a natural
-   *  crossfade between chords with no audible seam. */
-  private triggerPad(chord: ChordEntry): void {
-    if (!this.pad) return;
-    if (this.padCurrentNotes.length) {
+  /** Attack the next chord across all sustained voices (cello / pad /
+   *  strings), releasing the previous one. Long envelope releases overlap
+   *  the new attacks, producing a natural crossfade between chords with no
+   *  audible seam. Voicing is split across registers:
+   *    cello   = chord bass (single low note)
+   *    pad     = chord.notes[0..1]   (lower-mid)
+   *    strings = chord.notes[2..4]   (upper-mid + high)
+   */
+  private triggerHarmony(chord: ChordEntry): void {
+    // Release everything we're currently holding first.
+    if (this.pad && this.padCurrentNotes.length) {
       try {
         this.pad.triggerRelease(this.padCurrentNotes);
       } catch {
         /* PolySynth can throw if a voice was stolen — ignore. */
       }
     }
-    // Use the lower 3 chord tones for the pad. Bass + extensions live on
-    // the piano; the pad's job is to fill the harmonic middle.
-    const notes = chord.notes.slice(0, 3);
+    if (this.strings && this.stringsCurrentNotes.length) {
+      try {
+        this.strings.triggerRelease(this.stringsCurrentNotes);
+      } catch {
+        /* noop */
+      }
+    }
+    if (this.cello && this.celloCurrentNote) {
+      try {
+        this.cello.triggerRelease([this.celloCurrentNote]);
+      } catch {
+        /* noop */
+      }
+    }
+
+    // Attack the new voicings. Each layer owns a distinct register.
+    const padNotes = chord.notes.slice(0, 2);
+    const stringsNotes = chord.notes.slice(2, 5);
+    const celloNote = chord.bass;
+    if (this.pad) {
+      try {
+        this.pad.triggerAttack(padNotes);
+      } catch {
+        /* noop */
+      }
+    }
+    if (this.strings) {
+      try {
+        this.strings.triggerAttack(stringsNotes);
+      } catch {
+        /* noop */
+      }
+    }
+    if (this.cello) {
+      try {
+        this.cello.triggerAttack([celloNote]);
+      } catch {
+        /* noop */
+      }
+    }
+    this.padCurrentNotes = padNotes;
+    this.stringsCurrentNotes = stringsNotes;
+    this.celloCurrentNote = celloNote;
+  }
+
+  /** Release every currently-held sustained voice. */
+  private releaseHarmony(): void {
+    if (this.pad && this.padCurrentNotes.length) {
+      try {
+        this.pad.triggerRelease(this.padCurrentNotes);
+      } catch {
+        /* noop */
+      }
+    }
+    if (this.strings && this.stringsCurrentNotes.length) {
+      try {
+        this.strings.triggerRelease(this.stringsCurrentNotes);
+      } catch {
+        /* noop */
+      }
+    }
+    if (this.cello && this.celloCurrentNote) {
+      try {
+        this.cello.triggerRelease([this.celloCurrentNote]);
+      } catch {
+        /* noop */
+      }
+    }
+    this.padCurrentNotes = [];
+    this.stringsCurrentNotes = [];
+    this.celloCurrentNote = null;
+  }
+
+  /** Brushed snare swell. Used to mark round transitions in cyclic
+   *  techniques (active → rest, rest → active). The slow-attack envelope
+   *  means it crescendos into the new section rather than punching. */
+  private triggerSnare(): void {
+    if (!this.snare) return;
     try {
-      this.pad.triggerAttack(notes);
+      // 2n = a half-note's worth of envelope. With attack 0.6 + decay 1.4
+      // the audible swell runs ~1.5–2 s — long enough to feel like a brush
+      // roll, short enough not to bleed into the next phrase.
+      this.snare.triggerAttackRelease("2n");
     } catch {
       /* noop */
     }
-    this.padCurrentNotes = notes;
   }
 
   /** Ring the bell once. Used to open a session and to mark each time the
@@ -310,6 +482,7 @@ class AudioEngineImpl {
     this.chordIdx = 0;
     this.passIndex = 0;
     this.lastCycleNumber = 0;
+    this.lastWasCycle = null;
     // Soft intro chord at low velocity — sits under the "Get ready" countdown.
     if (this.piano.loaded) {
       const chord = PROGRESSION[0];
@@ -317,10 +490,10 @@ class AudioEngineImpl {
       this.piano.triggerAttackRelease(chord.bass, 4, t, 0.35);
       this.piano.triggerAttackRelease(chord.notes.slice(0, 3), 4, t + 0.15, 0.25);
     }
-    // Ambient bed: pad attacks the opening chord (slow 3s attack means it
-    // swells under the intro), noise fades in over the prelude, and a gentle
-    // bell rings as a "we're starting" cue.
-    this.triggerPad(PROGRESSION[0]);
+    // Ambient ensemble: cello / pad / strings all attack the opening chord
+    // (slow attacks mean they swell under the intro), noise fades in over
+    // the prelude, and a gentle bell rings as a "we're starting" cue.
+    this.triggerHarmony(PROGRESSION[0]);
     if (this.noiseVolume) this.noiseVolume.volume.rampTo(-30, 2.5);
     this.triggerBell(0.3);
   }
@@ -329,14 +502,7 @@ class AudioEngineImpl {
     if (!this.musicPlaying) return;
     this.musicPlaying = false;
     this.piano?.releaseAll();
-    if (this.pad && this.padCurrentNotes.length) {
-      try {
-        this.pad.triggerRelease(this.padCurrentNotes);
-      } catch {
-        /* noop */
-      }
-    }
-    this.padCurrentNotes = [];
+    this.releaseHarmony();
     if (this.noiseVolume)
       this.noiseVolume.volume.rampTo(-Infinity, 0.3);
   }
@@ -364,14 +530,7 @@ class AudioEngineImpl {
     window.setTimeout(
       () => {
         this.piano?.releaseAll();
-        if (this.pad && this.padCurrentNotes.length) {
-          try {
-            this.pad.triggerRelease(this.padCurrentNotes);
-          } catch {
-            /* noop */
-          }
-          this.padCurrentNotes = [];
-        }
+        this.releaseHarmony();
         if (this.noiseVolume) this.noiseVolume.volume.value = -Infinity;
         if (this.pianoVolume) this.pianoVolume.volume.value = restoreDb;
       },
@@ -397,6 +556,17 @@ class AudioEngineImpl {
     if (!this.piano || !this.piano.loaded) return;
     if (!this.settings.musicEnabled) return;
 
+    // Round-boundary detection: a brushed snare swell marks the transition
+    // when we cross between active cycling (cycleNumber > 0) and a rest /
+    // roundEnd phase (cycleNumber === 0). Skipped on the very first phase
+    // of a session (lastWasCycle === null) so we don't double up with the
+    // opening bell.
+    const isCycle = cycleNumber > 0;
+    if (this.lastWasCycle !== null && this.lastWasCycle !== isCycle) {
+      this.triggerSnare();
+    }
+    this.lastWasCycle = isCycle;
+
     // Advance the chord when we cross a cycle boundary. cycleNumber 0 means
     // a non-cycle phase (rest, roundEnd) — those keep the current chord.
     if (cycleNumber > 0 && cycleNumber !== this.lastCycleNumber) {
@@ -411,7 +581,7 @@ class AudioEngineImpl {
         }
       }
       this.lastCycleNumber = cycleNumber;
-      if (chordChanged) this.triggerPad(PROGRESSION[this.chordIdx]);
+      if (chordChanged) this.triggerHarmony(PROGRESSION[this.chordIdx]);
     }
 
     const chord = PROGRESSION[this.chordIdx];
