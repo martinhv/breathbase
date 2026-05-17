@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettings } from "@/lib/settings";
+import { enrollState } from "@/lib/program";
 
 const SLIDES = [
   {
@@ -19,6 +20,11 @@ const SLIDES = [
     title: "Start small",
     body: "Five minutes a day. Consistency matters more than duration.",
   },
+  {
+    icon: "🗓️",
+    title: "A seven-day start",
+    body: "We've laid out a one-week program — a different foundational practice each day. Pick it up on the home screen whenever you're ready.",
+  },
 ];
 
 export function Onboarding() {
@@ -27,18 +33,18 @@ export function Onboarding() {
   const { update } = useSettings();
   const isLast = i === SLIDES.length - 1;
 
+  const finish = () => {
+    update({ onboarded: true, program: enrollState() });
+    navigate("/", { replace: true });
+  };
   const next = () => {
     if (isLast) {
-      update({ onboarded: true });
-      navigate("/", { replace: true });
+      finish();
     } else {
       setI((v) => v + 1);
     }
   };
-  const skip = () => {
-    update({ onboarded: true });
-    navigate("/", { replace: true });
-  };
+  const skip = () => finish();
 
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">

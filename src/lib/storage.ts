@@ -22,6 +22,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { DEFAULT_VOICE_PROFILE } from "./voiceProfiles";
+import { DEFAULT_PROGRAM_STATE, type ProgramState } from "./program";
 
 export type SessionEntry = {
   /** Firestore document ID (omitted on write; populated on read). */
@@ -55,6 +56,8 @@ export type Settings = {
   reducedMotion: ReducedMotionPref;
   /** Per-technique duration overrides in minutes, keyed by technique id. */
   durationOverrides: Record<string, number>;
+  /** Seven-day guided program state. See lib/program.ts. */
+  program: ProgramState;
   onboarded: boolean;
   disclaimerAcknowledged: boolean;
 };
@@ -73,6 +76,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   reducedMotion: "auto",
   durationOverrides: {},
+  program: DEFAULT_PROGRAM_STATE,
   onboarded: false,
   disclaimerAcknowledged: false,
 };

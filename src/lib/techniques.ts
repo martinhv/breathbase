@@ -309,8 +309,16 @@ export const TECHNIQUES: Technique[] = [
       rounds: 3,
       cyclesPerRound: 8, // ~32s of active breathing per round
       rest: [
-        inhale(5, { label: "Settle", voicePrompt: "Settle" }),
-        exhale(10, { label: "Rest", voicePrompt: "Rest" }),
+        inhale(5, {
+          label: "Settle",
+          voicePrompt: "Settle",
+          meta: { note: "Slow nasal inhale — let the body unwind" },
+        }),
+        exhale(10, {
+          label: "Rest",
+          voicePrompt: "Rest",
+          meta: { note: "Soften shoulders and jaw. Notice tingling, warmth." },
+        }),
       ],
     },
     safetyNotes: [

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { BreathingOrb } from "@/components/BreathingOrb";
 import { PhaseIndicator } from "@/components/PhaseIndicator";
 import { NostrilDiagram } from "@/components/NostrilDiagram";
@@ -13,6 +18,7 @@ import { useSettings } from "@/lib/settings";
 import { useAuth } from "@/lib/auth";
 import { appendHistory } from "@/lib/storage";
 import { findTechnique, type Technique } from "@/lib/techniques";
+import { getProgramDay, markDayComplete } from "@/lib/program";
 
 type Stage =
   | "safety" // safety modal (only if technique has safetyNotes)
@@ -46,12 +52,27 @@ export function Session() {
 
 function SessionInner({ technique }: { technique: Technique }) {
   const navigate = useNavigate();
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  // If we're launched from the 7-day program (e.g. `?program=3`), and that
+  // day's prescribed technique matches the one we're running, use the
+  // program's duration — not the user's per-technique override. This keeps
+  // the "guided" feel: the program decides the dose.
+  const programDay = useMemo(() => {
+    const raw = searchParams.get("program");
+    if (!raw) return null;
+    const n = Number(raw);
+    const day = Number.isFinite(n) ? getProgramDay(n) : undefined;
+    if (!day) return null;
+    return day.techniqueId === technique.id ? day : null;
+  }, [searchParams, technique.id]);
 
   const duration = useMemo(() => {
+    if (programDay) return programDay.durationMin;
     return settings.durationOverrides[technique.id] ?? technique.defaultDurationMin;
-  }, [technique, settings.durationOverrides]);
+  }, [technique, settings.durationOverrides, programDay]);
 
   const audio = useAudioEngine();
   const { speak, cancel: cancelSpeech } = useSpeech();
@@ -134,7 +155,10 @@ function SessionInner({ technique }: { technique: Technique }) {
       // eslint-disable-next-line no-console
       console.error("Failed to save session:", e);
     });
-  }, [stage, technique, user]);
+    if (programDay && settings.program.enrolled) {
+      update({ program: markDayComplete(settings.program, programDay.day) });
+    }
+  }, [stage, technique, user, programDay, settings.program, update]);
 
   // Cleanup audio on unmount.
   useEffect(() => {
@@ -179,7 +203,9 @@ function SessionInner({ technique }: { technique: Technique }) {
           </div>
         </div>
         <button
-          onClick={() => navigate("/", { replace: true })}
+          onClick={() =>
+            navigate(programDay ? "/program" : "/", { replace: true })
+          }
           className="px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
           Done

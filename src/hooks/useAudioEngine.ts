@@ -9,9 +9,9 @@ import { DEFAULT_CHIME_HZ, type PhaseKind } from "@/lib/techniques";
  *
  * Sound design:
  *   - Acoustic piano (Salamander Grand, loaded from the Tone.js CDN) carries
- *     all melodic content. The chord progression cycles vi → IV → I → V in
- *     C major (Am9 → Fmaj9 → Cmaj9 → G6sus) — a Yasunori Mitsuda / Nobuo
- *     Uematsu staple that reads as both contemplative (Final Fantasy
+ *     all melodic content. The chord progression walks through 8 voicings in
+ *     C major / A minor — vi-IV-I-V then iii-vi-ii-V — a Yasunori Mitsuda /
+ *     Nobuo Uematsu staple that reads as both contemplative (Final Fantasy
  *     "To Zanarkand") and uplifting (Xenoblade "Forest of the Nopon").
  *   - Music is driven by the breath cycle, not by a fixed timer:
  *       inhale  → ascending arpeggio over the phase's exact duration
@@ -20,6 +20,19 @@ import { DEFAULT_CHIME_HZ, type PhaseKind } from "@/lib/techniques";
  *       hold_out→ low bass + soft inner chord
  *     The chord advances at every new cycle boundary, so the harmony
  *     develops in time with the breath rather than independently.
+ *   - Every time the 8-chord progression wraps, a `passIndex` counter
+ *     increments. Phrase shapes consult `passIndex` to subtly re-voice the
+ *     same harmony on each loop (skipping chord tones, octave shifts on
+ *     accent notes), so longer sessions don't lock into a perceptible loop.
+ *   - Three ambient layers sit underneath the piano on the same music bus:
+ *       * pad      – a slow, filter-modulated triangle/sine bed that holds
+ *                    the current chord between piano triggers (the biggest
+ *                    contributor to "presence"; fills the silent moments)
+ *       * air      – very quiet band-passed pink noise with a slow LFO on
+ *                    the filter, giving organic motion (~-30 dB under piano)
+ *       * bell     – a single FM bell that rings each time the progression
+ *                    wraps. Sparse by design — marks completion of a full
+ *                    8-chord journey, ~once every 1–2 min depending on cycle.
  *   - A separate sine Synth still handles per-transition chimes.
  *
  * Lifecycle:
@@ -37,6 +50,7 @@ type ChordEntry = {
 };
 
 const PROGRESSION: ChordEntry[] = [
+  // ── First half: classical pop turnaround vi-IV-I-V ─────────────────────
   // Am9 — vi9: A C E G B
   { bass: "A2", notes: ["A3", "C4", "E4", "G4", "B4"] },
   // Fmaj9 — IV9: F A C E G
@@ -45,6 +59,15 @@ const PROGRESSION: ChordEntry[] = [
   { bass: "C3", notes: ["C4", "E4", "G4", "B4", "D5"] },
   // G6sus4 — V suspended: G C D E A
   { bass: "G2", notes: ["G3", "C4", "D4", "E4", "A4"] },
+  // ── Second half: wander through iii-vi-ii-V before returning ───────────
+  // Em9 — iii9: E G B D F#  (the F# adds a lift / chromatic interest)
+  { bass: "E3", notes: ["E3", "G3", "B3", "D4", "F#4"] },
+  // Am11 — vi with extension, higher voicing: A E G B D
+  { bass: "A2", notes: ["E4", "G4", "B4", "D5", "E5"] },
+  // Dm9 — ii9: D F A C E
+  { bass: "D3", notes: ["F3", "A3", "C4", "E4", "G4"] },
+  // G7sus4 — V7sus, preps the return to vi: G C D F A
+  { bass: "G2", notes: ["G3", "C4", "D4", "F4", "A4"] },
 ];
 
 const linearToDb = (x: number): number => {
@@ -67,9 +90,28 @@ class AudioEngineImpl {
   private chimeVolume: Tone.Volume | null = null;
   private master: Tone.Volume | null = null;
 
+  // Ambient layers. All route through pianoVolume so a single bus controls
+  // the entire musical mix (musicEnabled / musicVolume / fadeOutMusic).
+  private pad: Tone.PolySynth | null = null;
+  private padFilter: Tone.Filter | null = null;
+  // LFOs need a held reference or they may be GC'd and stop modulating.
+  private padLfo: Tone.LFO | null = null;
+  private padVolume: Tone.Volume | null = null;
+  /** Currently-held pad chord; we release these before triggering the next. */
+  private padCurrentNotes: string[] = [];
+  private noise: Tone.Noise | null = null;
+  private noiseFilter: Tone.Filter | null = null;
+  private noiseLfo: Tone.LFO | null = null;
+  private noiseVolume: Tone.Volume | null = null;
+  private bell: Tone.FMSynth | null = null;
+  private bellVolume: Tone.Volume | null = null;
+
   private started = false;
   private musicPlaying = false;
   private chordIdx = 0;
+  /** Increments each time the chord progression wraps back to index 0.
+   * Phrase shapes use `passIndex % 2` to re-voice on alternate loops. */
+  private passIndex = 0;
   private lastCycleNumber = 0;
 
   private settings: Settings = DEFAULT_SETTINGS;
@@ -78,8 +120,11 @@ class AudioEngineImpl {
    * Build the audio graph. Idempotent. Called from `unlock()` after
    * Tone.start() so all nodes are constructed against a running context.
    *
-   *   piano → pianoVolume → reverb → master → destination
-   *   chime → chimeVolume → destination
+   *   piano  → pianoVolume → reverb → master → destination
+   *   pad    → padFilter   → padVolume   ┐
+   *   noise  → noiseFilter → noiseVolume ┼─→ pianoVolume (shared music bus)
+   *   bell   →              → bellVolume ┘
+   *   chime  → chimeVolume → destination (bypasses music bus + reverb)
    */
   private buildGraph(): void {
     if (this.piano) return;
@@ -115,6 +160,65 @@ class AudioEngineImpl {
       },
     }).connect(this.pianoVolume);
 
+    // ── Pad layer ──────────────────────────────────────────────────────
+    // Warm, slow-attack triangle bed. Filter cutoff sweeps slowly via LFO
+    // so the timbre breathes even while the chord is held.
+    this.padVolume = new Tone.Volume(-14).connect(this.pianoVolume);
+    this.padFilter = new Tone.Filter({
+      frequency: 700,
+      type: "lowpass",
+      Q: 0.8,
+    }).connect(this.padVolume);
+    this.padLfo = new Tone.LFO({
+      frequency: 0.07,
+      min: 400,
+      max: 1100,
+      type: "sine",
+    }).connect(this.padFilter.frequency);
+    this.padLfo.start();
+    this.pad = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "fattriangle", count: 3, spread: 18 },
+      envelope: { attack: 3, decay: 1.5, sustain: 0.8, release: 5 },
+    }).connect(this.padFilter);
+    // PolySynth's per-voice volume is a touch hot at default; tame it here.
+    this.pad.volume.value = -6;
+
+    // ── Air layer ──────────────────────────────────────────────────────
+    // Band-passed pink noise — adds organic "presence" without timbre.
+    // Starts silenced; startMusic() fades it in.
+    this.noiseVolume = new Tone.Volume(-Infinity).connect(this.pianoVolume);
+    this.noiseFilter = new Tone.Filter({
+      frequency: 700,
+      type: "bandpass",
+      Q: 1.5,
+    }).connect(this.noiseVolume);
+    this.noiseLfo = new Tone.LFO({
+      frequency: 0.04,
+      min: 400,
+      max: 1400,
+      type: "sine",
+    }).connect(this.noiseFilter.frequency);
+    this.noiseLfo.start();
+    this.noise = new Tone.Noise("pink").connect(this.noiseFilter);
+    this.noise.start();
+
+    // ── Bell layer ─────────────────────────────────────────────────────
+    // Sparse FM bell — rings once per full progression pass.
+    this.bellVolume = new Tone.Volume(-8).connect(this.pianoVolume);
+    this.bell = new Tone.FMSynth({
+      harmonicity: 3.5,
+      modulationIndex: 14,
+      oscillator: { type: "sine" },
+      modulation: { type: "sine" },
+      envelope: { attack: 0.005, decay: 1.8, sustain: 0, release: 4.5 },
+      modulationEnvelope: {
+        attack: 0.005,
+        decay: 0.6,
+        sustain: 0,
+        release: 1.5,
+      },
+    }).connect(this.bellVolume);
+
     this.chimeVolume = new Tone.Volume(
       s.chimesEnabled ? linearToDb(s.chimeVolume) - 6 : -Infinity,
     ).toDestination();
@@ -122,6 +226,42 @@ class AudioEngineImpl {
       oscillator: { type: "sine" },
       envelope: { attack: 0.02, decay: 0.4, sustain: 0, release: 1.6 },
     }).connect(this.chimeVolume);
+  }
+
+  /** Attack the next chord on the pad, releasing the previous one. The pad
+   *  envelope's long release overlaps the new attack, producing a natural
+   *  crossfade between chords with no audible seam. */
+  private triggerPad(chord: ChordEntry): void {
+    if (!this.pad) return;
+    if (this.padCurrentNotes.length) {
+      try {
+        this.pad.triggerRelease(this.padCurrentNotes);
+      } catch {
+        /* PolySynth can throw if a voice was stolen — ignore. */
+      }
+    }
+    // Use the lower 3 chord tones for the pad. Bass + extensions live on
+    // the piano; the pad's job is to fill the harmonic middle.
+    const notes = chord.notes.slice(0, 3);
+    try {
+      this.pad.triggerAttack(notes);
+    } catch {
+      /* noop */
+    }
+    this.padCurrentNotes = notes;
+  }
+
+  /** Ring the bell once. Used to open a session and to mark each time the
+   *  8-chord progression completes a full pass. */
+  private triggerBell(velocity = 0.4): void {
+    if (!this.bell) return;
+    try {
+      // C6 is the 5th of F major / tonic of C major — consonant against
+      // every chord in the progression.
+      this.bell.triggerAttackRelease("C6", "2n", undefined, velocity);
+    } catch {
+      /* noop */
+    }
   }
 
   async unlock(): Promise<void> {
@@ -168,6 +308,7 @@ class AudioEngineImpl {
     console.info("[audio] startMusic");
     this.musicPlaying = true;
     this.chordIdx = 0;
+    this.passIndex = 0;
     this.lastCycleNumber = 0;
     // Soft intro chord at low velocity — sits under the "Get ready" countdown.
     if (this.piano.loaded) {
@@ -176,12 +317,28 @@ class AudioEngineImpl {
       this.piano.triggerAttackRelease(chord.bass, 4, t, 0.35);
       this.piano.triggerAttackRelease(chord.notes.slice(0, 3), 4, t + 0.15, 0.25);
     }
+    // Ambient bed: pad attacks the opening chord (slow 3s attack means it
+    // swells under the intro), noise fades in over the prelude, and a gentle
+    // bell rings as a "we're starting" cue.
+    this.triggerPad(PROGRESSION[0]);
+    if (this.noiseVolume) this.noiseVolume.volume.rampTo(-30, 2.5);
+    this.triggerBell(0.3);
   }
 
   stopMusic(): void {
     if (!this.musicPlaying) return;
     this.musicPlaying = false;
     this.piano?.releaseAll();
+    if (this.pad && this.padCurrentNotes.length) {
+      try {
+        this.pad.triggerRelease(this.padCurrentNotes);
+      } catch {
+        /* noop */
+      }
+    }
+    this.padCurrentNotes = [];
+    if (this.noiseVolume)
+      this.noiseVolume.volume.rampTo(-Infinity, 0.3);
   }
 
   /**
@@ -207,6 +364,15 @@ class AudioEngineImpl {
     window.setTimeout(
       () => {
         this.piano?.releaseAll();
+        if (this.pad && this.padCurrentNotes.length) {
+          try {
+            this.pad.triggerRelease(this.padCurrentNotes);
+          } catch {
+            /* noop */
+          }
+          this.padCurrentNotes = [];
+        }
+        if (this.noiseVolume) this.noiseVolume.volume.value = -Infinity;
         if (this.pianoVolume) this.pianoVolume.volume.value = restoreDb;
       },
       Math.ceil(seconds * 1000) + 50,
@@ -234,12 +400,18 @@ class AudioEngineImpl {
     // Advance the chord when we cross a cycle boundary. cycleNumber 0 means
     // a non-cycle phase (rest, roundEnd) — those keep the current chord.
     if (cycleNumber > 0 && cycleNumber !== this.lastCycleNumber) {
+      let chordChanged = false;
       if (this.lastCycleNumber > 0) {
         this.chordIdx = (this.chordIdx + 1) % PROGRESSION.length;
-      } else {
-        this.chordIdx = 0;
+        chordChanged = true;
+        if (this.chordIdx === 0) {
+          this.passIndex += 1;
+          // The progression just looped — mark the moment with a bell.
+          this.triggerBell();
+        }
       }
       this.lastCycleNumber = cycleNumber;
+      if (chordChanged) this.triggerPad(PROGRESSION[this.chordIdx]);
     }
 
     const chord = PROGRESSION[this.chordIdx];
@@ -259,12 +431,22 @@ class AudioEngineImpl {
       return;
     }
 
+    const altPass = this.passIndex % 2 === 1;
+
     switch (phaseKind) {
       case "inhale": {
         // Ascending arpeggio over the exact phase duration.
-        // Bass anchors the start.
+        // Bass anchors the start. On alternate passes, drop a chord tone and
+        // top the arpeggio with an octave leap — same chord, sparser shape.
         this.piano.triggerAttackRelease(chord.bass, dur + 2, now, 0.55);
-        const notes = chord.notes;
+        const notes = altPass
+          ? [
+              chord.notes[0],
+              chord.notes[2],
+              chord.notes[chord.notes.length - 1],
+              shiftOctave(chord.notes[chord.notes.length - 1], 1),
+            ]
+          : chord.notes;
         const step = Math.max(0.18, dur / notes.length);
         notes.forEach((n, i) => {
           const t = now + i * step;
@@ -277,20 +459,29 @@ class AudioEngineImpl {
       }
 
       case "hold_in": {
-        // Ringing chord (top 3 notes). A single high melodic accent at the
+        // Ringing chord (top 3 notes). A single melodic accent at the
         // midpoint adds variation within an otherwise sustained moment.
+        // Alternate passes flip the accent: high on even, low on odd, so
+        // back-to-back holds don't feel identical.
         const topThree = chord.notes.slice(-3);
         this.piano.triggerAttackRelease(topThree, dur + 1, now, 0.45);
         const top = chord.notes[chord.notes.length - 1];
-        const accent = shiftOctave(top, 1);
+        const accent = altPass
+          ? shiftOctave(chord.notes[1] ?? top, -1)
+          : shiftOctave(top, 1);
         this.piano.triggerAttackRelease(accent, Math.max(0.8, dur / 2), now + dur / 2, 0.35);
         break;
       }
 
       case "exhale": {
         // Descending arpeggio. Bass on the downbeat.
+        // On alternate passes, lead in from one octave above the top note —
+        // the descent feels like it falls from higher.
         this.piano.triggerAttackRelease(chord.bass, dur + 2, now, 0.45);
-        const notes = [...chord.notes].reverse();
+        const reversed = [...chord.notes].reverse();
+        const notes = altPass
+          ? [shiftOctave(reversed[0], 1), ...reversed]
+          : reversed;
         const step = Math.max(0.18, dur / notes.length);
         notes.forEach((n, i) => {
           const t = now + i * step;
@@ -303,6 +494,8 @@ class AudioEngineImpl {
 
       case "hold_out": {
         // Quietest moment of the cycle — just bass and a low cluster.
+        // On alternate passes, add a whisper of the top tone late in the
+        // hold — a hint of the next inhale.
         this.piano.triggerAttackRelease(chord.bass, dur + 1, now, 0.32);
         this.piano.triggerAttackRelease(
           chord.notes.slice(0, 2),
@@ -310,6 +503,15 @@ class AudioEngineImpl {
           now + 0.15,
           0.22,
         );
+        if (altPass) {
+          const top = chord.notes[chord.notes.length - 1];
+          this.piano.triggerAttackRelease(
+            top,
+            0.6,
+            now + Math.max(0.1, dur - 0.4),
+            0.18,
+          );
+        }
         break;
       }
     }
