@@ -44,11 +44,24 @@ const COUNT_VOLUME_RATIO = 1.0;
 /** Don't bother counting on phases shorter than this. */
 const COUNT_MIN_PHASE_MS = 3000;
 
-/** Safety margin between the end of the action prompt and the first count. */
-const POST_ACTION_GAP_MS = 150;
+/** Minimum silence between the end of the action prompt and the first count.
+ *  Bumped up from 150 ms — count clips are ~1 s long and fire on a 1 s grid,
+ *  so a count landing right after the action prompt felt crowded (the prompt
+ *  + the count occupied the entire first 2 s of the phase with no breathing
+ *  room). One full second of silence is now required first, which usually
+ *  drops the highest two counts on long phases and leaves a clean countdown
+ *  near the end. */
+const POST_ACTION_GAP_MS = 1000;
+
+/** Allowed slop when a count clip's tail extends past the next count's start.
+ *  Tiny overhangs (under this) are imperceptible; anything more sounds like
+ *  the announcer is rushing into the next number and the count is skipped. */
+const COUNT_OVERLAP_TOLERANCE_MS = 200;
 
 /** Fallback if we don't yet have the measured duration for a clip. */
 const FALLBACK_ACTION_DURATION_MS = 1200;
+/** Fallback count-clip duration used until loadedmetadata resolves. */
+const FALLBACK_COUNT_DURATION_MS = 1000;
 
 const clipUrl = (profileId: string, slug: string): string =>
   `/voice/${profileId}/${slug}.mp3`;
@@ -76,6 +89,9 @@ export function useSpeech() {
 
   // Measured action-clip durations (ms), keyed by slug, for the active profile.
   const actionDurationsRef = useRef<Map<string, number>>(new Map());
+  // Measured count-clip durations (ms), keyed by N (1..MAX_COUNT). Used so we
+  // can skip a count whose tail would crowd the next one on a 1-s grid.
+  const countDurationsRef = useRef<Map<number, number>>(new Map());
 
   // Volumes — kept in sync with settings without re-creating audio elements.
   useEffect(() => {
@@ -107,13 +123,24 @@ export function useSpeech() {
       );
     }
 
-    // Count-clip pool. One Audio element per count number, preloaded.
+    // Count-clip pool. One Audio element per count number, preloaded. We also
+    // capture each clip's duration once it's known so the scheduler can avoid
+    // ones whose tail would crowd the next count.
+    countDurationsRef.current = new Map();
     const vol =
       Math.max(0, Math.min(1, settings.voiceVolume)) * COUNT_VOLUME_RATIO;
     countAudiosRef.current = Array.from({ length: MAX_COUNT }, (_, i) => {
       const a = new Audio(clipUrl(profile.id, `count-${i + 1}`));
       a.preload = "auto";
       a.volume = vol;
+      a.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (!Number.isFinite(a.duration)) return;
+          countDurationsRef.current.set(i + 1, a.duration * 1000);
+        },
+        { once: true },
+      );
       return a;
     });
   }, [settings.voiceProfile, settings.voiceVolume]);
@@ -158,11 +185,19 @@ export function useSpeech() {
       );
 
       // For each remaining-second count n, fire at (durationMs - n*1000) ms
-      // after phase start. Skip any that would land during the action prompt.
+      // after phase start. Skip ones that would either land during the action
+      // prompt or run too far past the slot of the next count — that's what
+      // produced the "rushed N" feeling on phases like belly-breathing's 6 s
+      // exhale (count-N clips are ~1 s but the gap to N-1 is exactly 1 s).
       for (let n = maxCount; n >= 1; n--) {
         const fireAt = durationMs - n * 1000;
         if (fireAt < earliestCountStartMs) continue;
         if (fireAt >= durationMs) continue;
+        const clipMs =
+          countDurationsRef.current.get(n) ?? FALLBACK_COUNT_DURATION_MS;
+        const nextEventMs =
+          n > 1 ? durationMs - (n - 1) * 1000 : durationMs;
+        if (fireAt + clipMs > nextEventMs + COUNT_OVERLAP_TOLERANCE_MS) continue;
         const handle = window.setTimeout(() => {
           const el = countAudiosRef.current[n - 1];
           if (!el) return;
