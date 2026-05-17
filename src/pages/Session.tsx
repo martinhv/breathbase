@@ -20,6 +20,7 @@ import { useHistory } from "@/lib/history";
 import { appendHistory } from "@/lib/storage";
 import { findTechnique, type Technique } from "@/lib/techniques";
 import { getProgramDay, markDayComplete } from "@/lib/program";
+import { track } from "@/lib/analytics";
 
 type Stage =
   | "safety" // safety modal (only if technique has safetyNotes)
@@ -145,6 +146,14 @@ function SessionInner({ technique }: { technique: Technique }) {
     if (stage !== "complete") return;
     if (historyWritten.current || !technique || !user) return;
     historyWritten.current = true;
+    track("session_complete", {
+      techniqueId: technique.id,
+      category: technique.category,
+      durationMin: Math.round(sessionRef.current.totalElapsedMs / 60000),
+      cyclesCompleted: sessionRef.current.cyclesCompleted,
+      soundscape: settings.soundscape,
+      voiceEnabled: settings.voiceEnabled,
+    });
     appendHistory(user.uid, {
       techniqueId: technique.id,
       techniqueName: technique.name,

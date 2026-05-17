@@ -20,6 +20,8 @@ services:
         VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
         VITE_FIREBASE_VAPID_KEY: ${VITE_FIREBASE_VAPID_KEY:-}
         VITE_LOCAL_MODE: ${VITE_LOCAL_MODE:-}
+        VITE_UMAMI_WEBSITE_ID: ${VITE_UMAMI_WEBSITE_ID:-}
+        VITE_UMAMI_SCRIPT_URL: ${VITE_UMAMI_SCRIPT_URL:-}
     image: breathbase:latest
     container_name: breathbase
     restart: unless-stopped

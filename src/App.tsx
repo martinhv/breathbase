@@ -12,6 +12,7 @@ import { SettingsProvider, useSettings } from "@/lib/settings";
 import { HistoryProvider } from "@/lib/history";
 import { applyTheme, subscribeSystemTheme } from "@/lib/theme";
 import { cancelReminder, scheduleReminder } from "@/lib/notifications";
+import { initAnalytics, trackPageView } from "@/lib/analytics";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { Home } from "@/pages/Home";
@@ -63,6 +64,20 @@ function SignedInApp() {
     }
     return cancelReminder;
   }, [settings.reminderEnabled, settings.reminderTime]);
+
+  // Analytics: (re)evaluate opt-in whenever the setting changes. No-op when
+  // the build wasn't configured with VITE_UMAMI_*.
+  useEffect(() => {
+    if (loading) return;
+    initAnalytics(settings.analyticsEnabled);
+  }, [loading, settings.analyticsEnabled]);
+
+  // Fire SPA pageviews on route change. Umami's auto-tracking is disabled in
+  // analytics.ts so we get one event per logical route, not per hard navigation.
+  useEffect(() => {
+    if (loading) return;
+    trackPageView(location.pathname);
+  }, [loading, location.pathname]);
 
   useEffect(() => {
     if (!hydrated) return;

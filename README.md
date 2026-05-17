@@ -16,7 +16,9 @@ techniques progressively, with linear day-by-day gating.
 
 By default the app uses Firebase Auth (Google sign-in) + Firestore for
 multi-device sync. For local testing or offline-only use, a **local mode**
-runs the whole app without Firebase — see below. No analytics either way.
+runs the whole app without Firebase — see below. Optional analytics go
+through a self-hosted Umami instance (off until you set `VITE_UMAMI_*`);
+no third-party trackers either way.
 
 ---
 
@@ -201,6 +203,37 @@ The build runs inside the container — the VM only needs Docker, not Node.
 
 Caddy passes these through unchanged; you don't need to duplicate them
 in the Caddyfile.
+
+---
+
+## Analytics (optional, self-hosted)
+
+BreathBase has no analytics out of the box. Setting both
+`VITE_UMAMI_WEBSITE_ID` and `VITE_UMAMI_SCRIPT_URL` at build time wires
+the app to a self-hosted [Umami](https://umami.is) instance — cookieless,
+no third-party trackers, all data stays under your control.
+
+When unset (the default), `src/lib/analytics.ts` is a no-op, no script is
+loaded, and the Privacy section in Settings hides itself.
+
+**Events fired** (all batched through Umami's `track()`):
+
+- Pageviews — one per logical SPA route, driven by react-router
+- `session_complete` — `{ techniqueId, category, durationMin, cyclesCompleted, soundscape, voiceEnabled }`
+- `soundscape_changed`, `voice_changed`, `reminder_toggled`, `onboarding_complete`
+- `error` — `{ message, source, line, column }` from `window.onerror` /
+  `unhandledrejection`, capped at 20 per session to avoid floods
+
+**Opt-out** is a toggle in Settings → Privacy, defaulting on (the
+defensible default for self-hosted, privacy-respecting analytics).
+`navigator.doNotTrack` is also respected — DNT users never load the
+script regardless of the toggle.
+
+**Self-hosting Umami** is out of scope for this repo, but the typical
+homelab pattern is: a third VM behind your Caddy, running the
+[official umami/umami Docker image](https://hub.docker.com/r/umami/umami)
+with a Postgres sidecar. Once it's up, copy the website ID and script URL
+into your `.env` and `docker compose up -d --build` to bake them in.
 
 ---
 

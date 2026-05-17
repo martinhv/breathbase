@@ -70,6 +70,9 @@ export type Settings = {
   lastDismissedSuggestionDate: string;
   onboarded: boolean;
   disclaimerAcknowledged: boolean;
+  /** Opt-out for the self-hosted Umami analytics. No-op when the build
+   *  wasn't configured with VITE_UMAMI_* anyway. Default on. */
+  analyticsEnabled: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -93,6 +96,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastDismissedSuggestionDate: "",
   onboarded: false,
   disclaimerAcknowledged: false,
+  analyticsEnabled: true,
 };
 
 const HISTORY_LIMIT = 200; // cap reads to last 200 sessions

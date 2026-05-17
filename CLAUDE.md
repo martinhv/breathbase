@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Conventions
+
+- **Do NOT add a `Co-Authored-By: Claude …` trailer to commits in this
+  repo.** Author the commit normally — the user wants a clean history
+  without AI co-author attribution.
+
 ## Commands
 
 ```bash
@@ -80,6 +86,22 @@ Three layers, outer to inner:
 1. **`AuthGate`** — shows `<Login>` when signed out, otherwise mounts `SettingsProvider`.
 2. **`SignedInApp`** — redirects to `/onboarding` until `settings.onboarded` is true, then shows `DisclaimerModal` until `settings.disclaimerAcknowledged` is set.
 3. **Routes:** `/`, `/category/:id`, `/session/:id`, `/settings`, `/onboarding`.
+
+### Analytics (`lib/analytics.ts`)
+
+Self-hosted Umami, gated by build-time `VITE_UMAMI_WEBSITE_ID` +
+`VITE_UMAMI_SCRIPT_URL`. When unset, the module is a no-op and the Privacy
+section in Settings hides itself. When set, the script is injected lazily
+on the first `initAnalytics()` call from `App.tsx` (after settings load),
+and SPA pageviews are fired manually from a `useLocation` effect (Umami's
+auto-track is disabled). User opt-out lives in `settings.analyticsEnabled`
+(default true); `navigator.doNotTrack` is also respected.
+
+Events: `session_complete` from `Session.tsx`, `soundscape_changed` /
+`voice_changed` / `reminder_toggled` from `Settings.tsx`,
+`onboarding_complete` from `Onboarding.tsx`, plus `error` from a global
+`window.onerror` + `unhandledrejection` listener installed when analytics
+activate (capped at 20/session).
 
 ### Safety constraint
 

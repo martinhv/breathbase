@@ -10,6 +10,7 @@ import { localMode } from "@/lib/firebase";
 import { TECHNIQUES } from "@/lib/techniques";
 import { VOICE_PROFILES } from "@/lib/voiceProfiles";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
+import { ANALYTICS_CONFIGURED, track } from "@/lib/analytics";
 import {
   getPermission as getNotificationPermission,
   isSupported as notificationsSupported,
@@ -358,7 +359,10 @@ export function Settings() {
                     key={s.id}
                     role="radio"
                     aria-checked={active}
-                    onClick={() => update({ soundscape: s.id })}
+                    onClick={() => {
+                      update({ soundscape: s.id });
+                      track("soundscape_changed", { soundscape: s.id });
+                    }}
                     className={`flex items-start gap-3 px-3 py-2 rounded-xl border transition text-left ${
                       active
                         ? "bg-teal-400/10 border-teal-400/40"
@@ -414,7 +418,10 @@ export function Settings() {
                     <button
                       role="radio"
                       aria-checked={active}
-                      onClick={() => update({ voiceProfile: v.id })}
+                      onClick={() => {
+                        update({ voiceProfile: v.id });
+                        track("voice_changed", { voiceProfile: v.id });
+                      }}
                       className="flex-1 text-left"
                     >
                       <div className="text-sm text-slate-800 dark:text-slate-200">{v.name}</div>
@@ -538,6 +545,7 @@ export function Settings() {
                   if (token) await unregisterDevice(user.uid, token);
                 }
                 update({ reminderEnabled: v });
+                track("reminder_toggled", { enabled: v });
               }}
             />
             {settings.reminderEnabled && (
@@ -622,6 +630,27 @@ export function Settings() {
             </button>
           </div>
         </Collapse>
+
+        {ANALYTICS_CONFIGURED && (
+          <Collapse
+            title="Privacy"
+            hint={settings.analyticsEnabled ? "analytics on" : "analytics off"}
+          >
+            <div className="divide-y divide-slate-900/5 dark:divide-white/5">
+              <Toggle
+                label="Help improve BreathBase (anonymous usage)"
+                checked={settings.analyticsEnabled}
+                onChange={(v) => update({ analyticsEnabled: v })}
+              />
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed py-3">
+                Self-hosted, cookieless. Sends page views, session completions
+                by technique, and which soundscape / voice / program you pick.
+                No personal data, no third-party trackers — see the source for
+                the full event list.
+              </p>
+            </div>
+          </Collapse>
+        )}
 
         {user && (
           <Collapse title="Data & account">

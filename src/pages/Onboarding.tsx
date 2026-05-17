@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettings } from "@/lib/settings";
 import { enrollState } from "@/lib/program";
+import { track } from "@/lib/analytics";
 
 const SLIDES = [
   {
@@ -33,12 +34,13 @@ export function Onboarding() {
   const { update } = useSettings();
   const isLast = i === SLIDES.length - 1;
 
-  const finish = () => {
+  const finish = (skipped: boolean) => {
     update({ onboarded: true, program: enrollState() });
+    track("onboarding_complete", { skipped });
     navigate("/", { replace: true });
   };
-  const next = () => (isLast ? finish() : setI((v) => v + 1));
-  const skip = () => finish();
+  const next = () => (isLast ? finish(false) : setI((v) => v + 1));
+  const skip = () => finish(true);
 
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
