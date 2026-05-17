@@ -17,6 +17,8 @@ There are no automated tests. Type-checking (`npm run lint`) is the primary corr
 
 **Local mode:** if `VITE_LOCAL_MODE=true` is set, **or** the `VITE_FIREBASE_*` env vars are all empty, the app skips Firebase entirely. A synthetic "local user" is signed in automatically (no Login screen) and settings/sessions persist to `window.localStorage` under `breathbase:local-user:*` keys. Useful for `npm run dev` on a fresh clone with zero setup, or offline-only testing. See `src/lib/firebase.ts` for the `localMode` flag — `storage.ts` and `auth.tsx` branch on it. Settings UI hides the sign-out button and relabels "Delete account" to "Clear local data".
 
+**Push reminders (optional):** if `VITE_FIREBASE_VAPID_KEY` is set, daily reminders are delivered via Firebase Cloud Messaging (background-capable) instead of the client-side `setTimeout`. Client wiring in `src/lib/push.ts`, scheduled Cloud Function in `functions/src/index.ts`, FCM service worker in `public/firebase-messaging-sw.js` (rewritten at build time by `scripts/build-fcm-sw.mjs` to inline Firebase config). See README "Push reminders" for the deploy steps.
+
 ## Architecture
 
 BreathBase is a mobile-first PWA (React 18 + TypeScript + Vite). Auth required (Google sign-in); per-user data lives in Firestore.

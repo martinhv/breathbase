@@ -1,13 +1,6 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  computeStreak,
-  lastSession,
-  loadHistory,
-  totalMinutes,
-  type SessionEntry,
-} from "@/lib/storage";
-import { useAuth } from "@/lib/auth";
+import { computeStreak, lastSession, totalMinutes } from "@/lib/storage";
+import { useHistory } from "@/lib/history";
 import { useSettings } from "@/lib/settings";
 import {
   PROGRAM,
@@ -16,7 +9,7 @@ import {
   isProgramComplete,
   nextProgramDay,
 } from "@/lib/program";
-import { THEMES, THEME_ORDER } from "@/lib/themes";
+import { THEMES, THEME_ORDER, suggestedThemeForHour } from "@/lib/themes";
 
 function formatRelative(iso: string): string {
   const d = new Date(iso);
@@ -91,6 +84,42 @@ function ProgramTile() {
   );
 }
 
+function todayKey(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function ThemeSuggestion() {
+  const { settings, update } = useSettings();
+  const now = new Date();
+  const today = todayKey(now);
+  if (settings.lastDismissedSuggestionDate === today) return null;
+  const { id, period } = suggestedThemeForHour(now.getHours());
+  const theme = THEMES[id];
+  return (
+    <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-teal-400/10 border border-teal-400/30">
+      <div className="text-xl" aria-hidden>
+        {theme.emoji}
+      </div>
+      <Link
+        to={`/theme/${id}`}
+        className="flex-1 text-sm text-slate-800 dark:text-slate-200 min-w-0"
+      >
+        <span className="font-medium">{period}</span> — try {theme.name}?
+      </Link>
+      <button
+        onClick={() => update({ lastDismissedSuggestionDate: today })}
+        aria-label="Dismiss suggestion"
+        className="p-1 -m-1 text-slate-500 dark:text-slate-400 hover:bg-slate-900/5 dark:hover:bg-white/10 rounded"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function ThemeCard({ themeId }: { themeId: keyof typeof THEMES }) {
   const t = THEMES[themeId];
   return (
@@ -112,23 +141,7 @@ function ThemeCard({ themeId }: { themeId: keyof typeof THEMES }) {
 }
 
 export function Home() {
-  const { user } = useAuth();
-  const [history, setHistory] = useState<SessionEntry[]>([]);
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    loadHistory(user.uid)
-      .then((h) => {
-        if (!cancelled) setHistory(h);
-      })
-      .catch((e) => {
-        // eslint-disable-next-line no-console
-        console.error("Failed to load history:", e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+  const { history } = useHistory();
   const streak = computeStreak(history);
   const minutes = totalMinutes(history);
   const last = lastSession(history);
@@ -143,6 +156,8 @@ export function Home() {
       </header>
 
       <ProgramTile />
+
+      <ThemeSuggestion />
 
       <section
         aria-label="Themes"

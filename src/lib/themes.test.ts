@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { THEMES, THEME_ORDER, getTheme, type ThemeId } from "./themes";
+import {
+  THEMES,
+  THEME_ORDER,
+  getTheme,
+  suggestedThemeForHour,
+  type ThemeId,
+} from "./themes";
 import { findTechnique } from "./techniques";
 
 describe("THEMES", () => {
@@ -40,5 +46,26 @@ describe("getTheme", () => {
   it("returns undefined for unknown ids", () => {
     // @ts-expect-error — testing a runtime guard for invalid id strings.
     expect(getTheme("does-not-exist")).toBeUndefined();
+  });
+});
+
+describe("suggestedThemeForHour", () => {
+  it("morning hours suggest energy", () => {
+    expect(suggestedThemeForHour(6).id).toBe("energy");
+    expect(suggestedThemeForHour(10).id).toBe("energy");
+  });
+  it("midday suggests focus", () => {
+    expect(suggestedThemeForHour(11).id).toBe("focus");
+    expect(suggestedThemeForHour(16).id).toBe("focus");
+  });
+  it("late afternoon suggests stress reset", () => {
+    expect(suggestedThemeForHour(17).id).toBe("stress");
+    expect(suggestedThemeForHour(19).id).toBe("stress");
+  });
+  it("evening + night + early morning suggest sleep", () => {
+    expect(suggestedThemeForHour(20).id).toBe("sleep");
+    expect(suggestedThemeForHour(23).id).toBe("sleep");
+    expect(suggestedThemeForHour(0).id).toBe("sleep");
+    expect(suggestedThemeForHour(4).id).toBe("sleep");
   });
 });

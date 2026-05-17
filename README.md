@@ -70,6 +70,44 @@ npm run dev
 5. **Authentication → Settings → Authorized domains** → add your production
    domain (`localhost` is allowed by default).
 
+### Optional — push reminders that fire when the app is closed
+
+Daily reminders work out of the box, but only while a BreathBase tab is open.
+To deliver reminders via background push (the way Calm / Headspace do it),
+wire up Firebase Cloud Messaging + the scheduled Cloud Function in
+`functions/`:
+
+1. **Firebase Console → Project settings → Cloud Messaging** → under *Web
+   configuration*, click **Generate key pair** to create a VAPID key. Paste
+   it into `.env.local`:
+
+   ```
+   VITE_FIREBASE_VAPID_KEY=BL...your-key...
+   ```
+
+2. **Upgrade to the Blaze plan** — Cloud Functions deploys require it.
+   Free-tier usage limits comfortably cover a 5-min scheduled function for
+   a small user base.
+
+3. **Install function dependencies and deploy:**
+
+   ```bash
+   cd functions
+   npm install
+   npm run deploy   # alias for: firebase deploy --only functions
+   ```
+
+   The function `sendReminders` runs every 5 minutes, reads each user's
+   `/users/{uid}/devices/{fcmToken}` doc, computes the device's local time
+   from its stored timezone, and sends pushes to any device whose
+   `reminderTime` matches the current slot.
+
+When the VAPID key is set, the Settings page automatically registers an FCM
+token whenever a user enables reminders; the explainer line updates to
+*"Reminders are delivered via Firebase Cloud Messaging — they fire even
+when BreathBase is closed."* Without the VAPID key it falls back to the
+client-side setTimeout that only fires with a tab open.
+
 ### Other commands
 
 ```bash
@@ -235,17 +273,25 @@ piano ensemble for a procedural bed:
 All routes share the music bus (`pianoVolume`), so one `musicEnabled`
 toggle controls everything.
 
-### Reminders — `lib/notifications.ts`
+### Reminders — `lib/notifications.ts` + `lib/push.ts` + `functions/`
 
-A simple daily-practice reminder using the Web Notifications API. The
-user enables it + picks a time in Settings, and `App.tsx` schedules a
-self-rearming `setTimeout` that fires `new Notification(...)` at the
-chosen time.
+Two delivery paths, picked automatically:
 
-**Honest scope:** reminders only fire while a BreathBase tab is alive.
-True background push (when the app is closed) requires Web Push + a
-server to schedule sends, which would build on the existing Firebase
-project but isn't wired up yet.
+- **Server-side push (preferred)** — when `VITE_FIREBASE_VAPID_KEY` is set
+  and the user is signed into Firebase, `lib/push.ts` requests an FCM
+  token, registers it in Firestore at `/users/{uid}/devices/{fcmToken}`
+  with the user's chosen `reminderTime` + `reminderTimezone`. A scheduled
+  Cloud Function (`functions/src/index.ts`) runs every 5 minutes, reads
+  every device doc, computes each device's local time, and fires a push
+  to any device whose reminder time matches the current slot. Stale
+  tokens (uninstalled app, etc.) are auto-cleaned. Background SW:
+  `public/firebase-messaging-sw.js`, rewritten at build time by
+  `scripts/build-fcm-sw.mjs` to inline the Firebase config (SWs can't
+  read `import.meta.env`). See README "Push reminders" for deploy steps.
+- **Client-side fallback (`lib/notifications.ts`)** — when push isn't
+  configured (no VAPID key, local mode, denied permission), `App.tsx`
+  schedules a self-rearming `setTimeout` that fires `new Notification(...)`
+  at the chosen time. Only fires while a BreathBase tab is alive.
 
 ### Local mode — `lib/firebase.ts`
 
@@ -335,10 +381,9 @@ safety scaffolding:
 
 Smaller in-progress items, in roughly the order they'd be useful:
 
-- **Server-side push reminders** — wire FCM + a daily Cloud Function so
-  reminders fire when the app is closed (today's reminders only fire
-  while a tab is open).
 - **Custom techniques** — let users define their own breath patterns.
+- **Camera-based HRV biofeedback** — read pulse via PPG, show users their
+  parasympathetic shift before/after a session.
 - **HealthKit / Google Fit** — write mindfulness minutes to the OS-level
   health store (needs a native shell on iOS).
 

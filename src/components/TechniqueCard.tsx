@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import type { Technique } from "@/lib/techniques";
 import { useSettings } from "@/lib/settings";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
+import { EMPTY_STATS, useHistory } from "@/lib/history";
 
 /**
  * A handful of round-number duration choices within the technique's allowed
@@ -30,11 +31,13 @@ function durationPresets(t: Technique): number[] {
 export function TechniqueCard({ t }: { t: Technique }) {
   const { settings, update } = useSettings();
   const audio = useAudioEngine();
+  const { summary } = useHistory();
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
   const duration =
     settings.durationOverrides[t.id] ?? t.defaultDurationMin;
   const presets = durationPresets(t);
+  const stats = summary[t.id] ?? EMPTY_STATS;
 
   const setDuration = (mins: number) => {
     update({
@@ -44,8 +47,13 @@ export function TechniqueCard({ t }: { t: Technique }) {
 
   return (
     <article className="p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
-      <header className="mb-2">
+      <header className="mb-2 flex items-baseline justify-between gap-3">
         <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">{t.name}</h3>
+        {stats.count > 0 && (
+          <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 tabular-nums whitespace-nowrap">
+            {stats.count}× · {Math.round(stats.totalMs / 60_000)}m total
+          </div>
+        )}
       </header>
       <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
         {t.shortDescription}

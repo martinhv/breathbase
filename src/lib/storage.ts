@@ -65,6 +65,9 @@ export type Settings = {
   reminderEnabled: boolean;
   /** "HH:MM" in 24h format. */
   reminderTime: string;
+  /** YYYY-MM-DD of the last day the user dismissed the home-screen theme
+   *  suggestion. Empty string = never dismissed (so the banner shows). */
+  lastDismissedSuggestionDate: string;
   onboarded: boolean;
   disclaimerAcknowledged: boolean;
 };
@@ -87,6 +90,7 @@ export const DEFAULT_SETTINGS: Settings = {
   program: DEFAULT_PROGRAM_STATE,
   reminderEnabled: false,
   reminderTime: "08:00",
+  lastDismissedSuggestionDate: "",
   onboarded: false,
   disclaimerAcknowledged: false,
 };

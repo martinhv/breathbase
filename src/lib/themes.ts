@@ -82,3 +82,22 @@ export const THEMES: Record<ThemeId, Theme> = {
 export const THEME_ORDER: ThemeId[] = ["sleep", "stress", "focus", "energy"];
 
 export const getTheme = (id: ThemeId): Theme | undefined => THEMES[id];
+
+/** Pick a theme to suggest based on the hour of day.
+ *
+ * - 05–10  → Energy   (morning lift)
+ * - 11–16  → Focus    (work / mid-day)
+ * - 17–19  → Stress   (afternoon dip / transition into evening)
+ * - 20–04  → Sleep    (evening, late night)
+ */
+export function suggestedThemeForHour(hour: number): {
+  id: ThemeId;
+  period: string;
+} {
+  if (hour >= 5 && hour <= 10) return { id: "energy", period: "Morning" };
+  if (hour >= 11 && hour <= 16) return { id: "focus", period: "Afternoon" };
+  if (hour >= 17 && hour <= 19)
+    return { id: "stress", period: "Late afternoon" };
+  return { id: "sleep", period: "Evening" };
+}
+

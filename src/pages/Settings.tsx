@@ -15,6 +15,13 @@ import {
   isSupported as notificationsSupported,
   requestPermission as requestNotificationPermission,
 } from "@/lib/notifications";
+import {
+  detectTimezone,
+  isPushAvailable,
+  obtainPushToken,
+  registerDevice,
+  unregisterDevice,
+} from "@/lib/push";
 
 const SOUNDSCAPE_OPTIONS: {
   id: Soundscape;
@@ -172,6 +179,33 @@ export function Settings() {
   useEffect(() => {
     setNotifPermission(getNotificationPermission());
   }, [settings.reminderEnabled]);
+
+  // Keep the device's reminder time in Firestore in sync when the user
+  // edits it. The server function reads from Firestore each tick, so a
+  // late write is enough — no need to re-prompt the user.
+  useEffect(() => {
+    if (!settings.reminderEnabled || !user) return;
+    if (!isPushAvailable()) return;
+    if (notifPermission !== "granted") return;
+    let cancelled = false;
+    (async () => {
+      const token = await obtainPushToken();
+      if (cancelled || !token) return;
+      await registerDevice(user.uid, {
+        fcmToken: token,
+        reminderTime: settings.reminderTime,
+        reminderTimezone: detectTimezone(),
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    settings.reminderEnabled,
+    settings.reminderTime,
+    user,
+    notifPermission,
+  ]);
 
   const activeVoice = VOICE_PROFILES.find((v) => v.id === settings.voiceProfile);
 
@@ -486,6 +520,22 @@ export function Settings() {
                     // Don't enable if the user denied or the browser blocked.
                     return;
                   }
+                  // If push is configured (VAPID + production Firebase),
+                  // register an FCM token for server-side delivery.
+                  if (isPushAvailable() && user) {
+                    const token = await obtainPushToken();
+                    if (token) {
+                      await registerDevice(user.uid, {
+                        fcmToken: token,
+                        reminderTime: settings.reminderTime,
+                        reminderTimezone: detectTimezone(),
+                      });
+                    }
+                  }
+                } else if (isPushAvailable() && user) {
+                  // Best-effort cleanup of any prior FCM registration.
+                  const token = await obtainPushToken();
+                  if (token) await unregisterDevice(user.uid, token);
                 }
                 update({ reminderEnabled: v });
               }}
@@ -508,7 +558,9 @@ export function Settings() {
                 ? "Notifications aren't available in this browser."
                 : notifPermission === "denied"
                   ? "Notifications are blocked. Enable them for breathbase.app in your browser settings, then re-enable here."
-                  : "Reminders fire only while BreathBase is open in a tab or installed as a home-screen app. Background reminders need server-side push (a future addition)."}
+                  : isPushAvailable()
+                    ? "Reminders are delivered via Firebase Cloud Messaging — they fire even when BreathBase is closed."
+                    : "Reminders fire only while BreathBase is open in a tab. Set VITE_FIREBASE_VAPID_KEY and deploy the reminder Cloud Function for background push (see README)."}
             </p>
           </div>
         </Collapse>

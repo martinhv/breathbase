@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@/lib/auth";
 import {
   computeStreak,
-  loadHistory,
   totalMinutes,
   type SessionEntry,
 } from "@/lib/storage";
+import { useHistory } from "@/lib/history";
 import { CATEGORIES, type Category } from "@/lib/techniques";
+import { WeeklyChart } from "@/components/WeeklyChart";
 
 type Filter = "all" | Category;
 
@@ -27,35 +27,17 @@ function groupByDay(history: SessionEntry[]): Array<[string, SessionEntry[]]> {
 }
 
 export function History() {
-  const { user } = useAuth();
-  const [history, setHistory] = useState<SessionEntry[] | null>(null);
+  const { history, loading } = useHistory();
   const [filter, setFilter] = useState<Filter>("all");
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    loadHistory(user.uid)
-      .then((h) => {
-        if (!cancelled) setHistory(h);
-      })
-      .catch((e) => {
-        // eslint-disable-next-line no-console
-        console.error("Failed to load history:", e);
-        if (!cancelled) setHistory([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   const allCategories: Filter[] = ["all", "downregulate", "upregulate", "balance", "focus"];
 
-  const filtered = (history ?? []).filter(
+  const filtered = history.filter(
     (e) => filter === "all" || e.category === filter,
   );
-  const streak = history ? computeStreak(history) : 0;
-  const minutes = history ? totalMinutes(history) : 0;
-  const sessions = history?.length ?? 0;
+  const streak = computeStreak(history);
+  const minutes = totalMinutes(history);
+  const sessions = history.length;
   const grouped = groupByDay(filtered);
 
   return (
@@ -92,6 +74,8 @@ export function History() {
         </div>
       </section>
 
+      <WeeklyChart history={history} />
+
       <section
         className="flex items-center gap-1.5 flex-wrap mb-4"
         role="radiogroup"
@@ -118,7 +102,7 @@ export function History() {
         })}
       </section>
 
-      {history === null ? (
+      {loading ? (
         <p className="text-slate-600 dark:text-slate-400 text-sm">Loading…</p>
       ) : filtered.length === 0 ? (
         <p className="text-slate-600 dark:text-slate-400 text-sm">

@@ -1,6 +1,9 @@
 node_modules
 dist
 dist-ssr
+functions/node_modules
+functions/lib
+functions/.firebase
 .vite
 *.local
 .DS_Store

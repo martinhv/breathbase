@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider, useSettings } from "@/lib/settings";
+import { HistoryProvider } from "@/lib/history";
 import { applyTheme, subscribeSystemTheme } from "@/lib/theme";
 import { cancelReminder, scheduleReminder } from "@/lib/notifications";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
@@ -111,7 +112,9 @@ function AuthGate() {
   }
   return (
     <SettingsProvider>
-      <SignedInApp />
+      <HistoryProvider>
+        <SignedInApp />
+      </HistoryProvider>
     </SettingsProvider>
   );
 }

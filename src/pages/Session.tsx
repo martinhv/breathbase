@@ -16,6 +16,7 @@ import { useSpeech } from "@/hooks/useSpeech";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useSettings } from "@/lib/settings";
 import { useAuth } from "@/lib/auth";
+import { useHistory } from "@/lib/history";
 import { appendHistory } from "@/lib/storage";
 import { findTechnique, type Technique } from "@/lib/techniques";
 import { getProgramDay, markDayComplete } from "@/lib/program";
@@ -54,6 +55,7 @@ function SessionInner({ technique }: { technique: Technique }) {
   const navigate = useNavigate();
   const { settings, update } = useSettings();
   const { user } = useAuth();
+  const { reload: reloadHistory } = useHistory();
   const [searchParams] = useSearchParams();
 
   // If we're launched from the Foundations program (e.g. `?program=3`), and
@@ -152,14 +154,16 @@ function SessionInner({ technique }: { technique: Technique }) {
       ).toISOString(),
       durationMs: sessionRef.current.totalElapsedMs,
       cyclesCompleted: sessionRef.current.cyclesCompleted,
-    }).catch((e) => {
-      // eslint-disable-next-line no-console
-      console.error("Failed to save session:", e);
-    });
+    })
+      .then(() => reloadHistory())
+      .catch((e) => {
+        // eslint-disable-next-line no-console
+        console.error("Failed to save session:", e);
+      });
     if (programDay && settings.program.enrolled) {
       update({ program: markDayComplete(settings.program, programDay.day) });
     }
-  }, [stage, technique, user, programDay, settings.program, update]);
+  }, [stage, technique, user, programDay, settings.program, update, reloadHistory]);
 
   // Cleanup audio on unmount.
   useEffect(() => {

@@ -17,6 +17,10 @@ export default defineConfig({
         // download all 5 voices' worth of clips (~1.5MB) on first visit.
         // Instead they're cached at runtime as the active voice plays them.
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        // firebase-messaging-sw.js is loaded by the FCM SDK directly and is
+        // rewritten by scripts/build-fcm-sw.mjs after Vite's build, so it
+        // must not be part of Workbox's precache (which hashes content).
+        globIgnores: ["**/firebase-messaging-sw.js"],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith("/voice/"),
@@ -68,6 +72,7 @@ export default defineConfig({
             "firebase/app",
             "firebase/auth",
             "firebase/firestore",
+            "firebase/messaging",
           ],
           tone: ["tone"],
           framer: ["framer-motion"],
