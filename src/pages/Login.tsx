@@ -1,23 +1,111 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
+import { track } from "@/lib/analytics";
+
+type EmailMode = "signIn" | "signUp";
+
+// Friendly mapping for the Firebase auth error codes we actually expect to
+// hit from this form. Anything outside the list falls back to the raw message.
+function friendlyAuthError(code: string | undefined, fallback: string): string {
+  switch (code) {
+    case "auth/invalid-email":
+      return "That email address doesn't look right.";
+    case "auth/missing-password":
+      return "Please enter your password.";
+    case "auth/weak-password":
+      return "Password is too short. Use at least 6 characters.";
+    case "auth/email-already-in-use":
+      return "An account with that email already exists. Try signing in instead.";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return "Email or password is incorrect.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Try again in a few minutes or reset your password.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    default:
+      return fallback;
+  }
+}
 
 export function Login() {
-  const { signInWithGoogle, error } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const {
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    sendPasswordReset,
+    error: contextError,
+  } = useAuth();
 
-  const onSignIn = async () => {
-    setBusy(true);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [mode, setMode] = useState<EmailMode>("signIn");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [resetInfo, setResetInfo] = useState<string | null>(null);
+
+  const onGoogle = async () => {
+    setGoogleBusy(true);
+    setFormError(null);
+    setResetInfo(null);
     try {
       await signInWithGoogle();
+      track("sign_in", { method: "google" });
     } finally {
-      setBusy(false);
+      setGoogleBusy(false);
     }
   };
 
+  const onEmailSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setResetInfo(null);
+    setEmailBusy(true);
+    try {
+      if (mode === "signIn") {
+        await signInWithEmail(email.trim(), password);
+        track("sign_in", { method: "email" });
+      } else {
+        await signUpWithEmail(email.trim(), password);
+        track("sign_up", { method: "email" });
+      }
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      setFormError(
+        friendlyAuthError(code, (err as Error).message ?? "Something went wrong"),
+      );
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const onForgotPassword = async () => {
+    setFormError(null);
+    setResetInfo(null);
+    const target = email.trim();
+    if (!target) {
+      setFormError("Enter your email above first, then tap 'Forgot password?'.");
+      return;
+    }
+    try {
+      await sendPasswordReset(target);
+      setResetInfo(`Sent a reset link to ${target}. Check your inbox.`);
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      setFormError(
+        friendlyAuthError(code, (err as Error).message ?? "Couldn't send reset email"),
+      );
+    }
+  };
+
+  const displayError = formError ?? contextError;
+
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
-      <div className="flex-1 flex flex-col items-center justify-center text-center gap-6">
+      <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 pt-8">
         <div className="text-6xl">🌬️</div>
         <div>
           <h1 className="text-3xl font-light tracking-tight">BreathBase</h1>
@@ -33,19 +121,103 @@ export function Login() {
 
       <div className="flex flex-col gap-3">
         <button
-          onClick={onSignIn}
-          disabled={busy}
+          onClick={onGoogle}
+          disabled={googleBusy || emailBusy}
           className="w-full px-5 py-3 rounded-2xl bg-white text-ink-950 font-medium hover:bg-slate-100 disabled:opacity-60 flex items-center justify-center gap-3"
         >
           <GoogleMark />
-          {busy ? "Signing in…" : "Continue with Google"}
+          {googleBusy ? "Signing in…" : "Continue with Google"}
         </button>
-        {error && (
+
+        <div className="flex items-center gap-3 py-1">
+          <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
+          <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            or
+          </span>
+          <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
+        </div>
+
+        <form onSubmit={onEmailSubmit} className="flex flex-col gap-2">
+          <label className="sr-only" htmlFor="email">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            required
+            className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
+          />
+          <label className="sr-only" htmlFor="password">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete={mode === "signIn" ? "current-password" : "new-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            required
+            minLength={6}
+            className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
+          />
+          <button
+            type="submit"
+            disabled={emailBusy || googleBusy}
+            className="w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300 disabled:opacity-60"
+          >
+            {emailBusy
+              ? mode === "signIn"
+                ? "Signing in…"
+                : "Creating account…"
+              : mode === "signIn"
+                ? "Sign in"
+                : "Create account"}
+          </button>
+        </form>
+
+        <div className="flex items-center justify-between text-[12px] text-slate-600 dark:text-slate-400 px-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMode((m) => (m === "signIn" ? "signUp" : "signIn"));
+              setFormError(null);
+              setResetInfo(null);
+            }}
+            className="hover:underline underline-offset-2"
+          >
+            {mode === "signIn"
+              ? "Need an account? Create one"
+              : "Have an account? Sign in"}
+          </button>
+          {mode === "signIn" && (
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="hover:underline underline-offset-2"
+            >
+              Forgot password?
+            </button>
+          )}
+        </div>
+
+        {displayError && (
           <p role="alert" className="text-xs text-red-300 text-center">
-            {error}
+            {displayError}
           </p>
         )}
-        <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center max-w-xs mx-auto leading-relaxed">
+        {resetInfo && (
+          <p role="status" className="text-xs text-teal-300 text-center">
+            {resetInfo}
+          </p>
+        )}
+
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center max-w-xs mx-auto leading-relaxed pt-2">
           By continuing you agree to use this app as an educational tool, not
           medical advice. See safety details after sign-in.
         </p>

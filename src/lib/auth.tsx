@@ -16,9 +16,14 @@ import {
   type ReactNode,
 } from "react";
 import {
+  EmailAuthProvider,
+  createUserWithEmailAndPassword,
   deleteUser,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   reauthenticateWithPopup,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signOut as fbSignOut,
   type User,
@@ -32,11 +37,20 @@ type AuthContextValue = {
   user: User | null;
   status: AuthStatus;
   signInWithGoogle: () => Promise<void>;
+  /** Email/password sign-in. Throws the original Firebase error so the caller
+   *  can map the error code to a friendly message. */
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  /** Email/password account creation. After success the user is signed in.
+   *  Throws the Firebase error on failure so the caller can surface it. */
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  /** Trigger a password-reset email. Throws on failure. */
+  sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   /**
    * Wipe all of the current user's Firestore data and delete their Firebase
    * Auth account. If Firebase requires a recent login, this transparently
-   * triggers a re-auth popup and retries. In local mode this clears the
+   * re-auths against the provider the user signed in with (Google popup or
+   * an email/password prompt) and retries. In local mode this clears the
    * locally-stored data — there's no auth account to delete.
    */
   deleteAccount: () => Promise<void>;
@@ -83,6 +97,44 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signInWithEmail = useCallback(
+    async (email: string, password: string) => {
+      setError(null);
+      // Let the caller catch and surface a friendly mapping of the Firebase
+      // error code; setting context-level `error` is just a fallback.
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        setError((e as Error).message ?? "Sign-in failed");
+        throw e;
+      }
+    },
+    [],
+  );
+
+  const signUpWithEmail = useCallback(
+    async (email: string, password: string) => {
+      setError(null);
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        setError((e as Error).message ?? "Sign-up failed");
+        throw e;
+      }
+    },
+    [],
+  );
+
+  const sendPasswordReset = useCallback(async (email: string) => {
+    setError(null);
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (e) {
+      setError((e as Error).message ?? "Reset email failed");
+      throw e;
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     setError(null);
     await fbSignOut(auth);
@@ -102,7 +154,24 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       const code = (e as { code?: string }).code;
       if (code === "auth/requires-recent-login") {
-        await reauthenticateWithPopup(current, googleProvider);
+        // Re-auth against whichever provider the user signed in with.
+        // window.prompt is functional but ugly — a proper modal would be
+        // nicer but adds significant UI scope; the prompt only appears in
+        // the edge case of a long-running session where Firebase has aged
+        // the session past its re-auth threshold.
+        const provider = current.providerData[0]?.providerId;
+        if (provider === "password") {
+          const email = current.email;
+          if (!email) throw e;
+          const password = typeof window !== "undefined"
+            ? window.prompt("For security, re-enter your password to delete your account:")
+            : null;
+          if (!password) throw e;
+          const cred = EmailAuthProvider.credential(email, password);
+          await reauthenticateWithCredential(current, cred);
+        } else {
+          await reauthenticateWithPopup(current, googleProvider);
+        }
         await deleteUser(current);
       } else {
         throw e;
@@ -115,11 +184,24 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
       user,
       status,
       signInWithGoogle,
+      signInWithEmail,
+      signUpWithEmail,
+      sendPasswordReset,
       signOut,
       deleteAccount,
       error,
     }),
-    [user, status, signInWithGoogle, signOut, deleteAccount, error],
+    [
+      user,
+      status,
+      signInWithGoogle,
+      signInWithEmail,
+      signUpWithEmail,
+      sendPasswordReset,
+      signOut,
+      deleteAccount,
+      error,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -137,6 +219,15 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
       user: LOCAL_USER,
       status: "signedIn",
       signInWithGoogle: async () => {
+        /* no-op in local mode */
+      },
+      signInWithEmail: async () => {
+        /* no-op in local mode */
+      },
+      signUpWithEmail: async () => {
+        /* no-op in local mode */
+      },
+      sendPasswordReset: async () => {
         /* no-op in local mode */
       },
       signOut: async () => {
