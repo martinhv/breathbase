@@ -1,0 +1,36 @@
+# BreathBase production deploy — meant to run on the app VM behind a
+# separate Caddy VM that terminates TLS and reverse-proxies to port 8080.
+#
+# Usage on the VM:
+#   cp deploy/.env.production.example .env
+#   # edit .env, filling in your VITE_FIREBASE_* values
+#   docker compose up -d --build
+
+services:
+  breathbase:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_VAPID_KEY: ${VITE_FIREBASE_VAPID_KEY:-}
+        VITE_LOCAL_MODE: ${VITE_LOCAL_MODE:-}
+    image: breathbase:latest
+    container_name: breathbase
+    restart: unless-stopped
+    # Bind to all interfaces on the VM so the Caddy VM can reach it. Lock
+    # this down with a host firewall (ufw / Proxmox firewall) so only the
+    # Caddy VM's IP can talk to :8080.
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

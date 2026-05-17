@@ -123,6 +123,87 @@ Android Chrome.
 
 ---
 
+## Deploying behind a separate Caddy VM
+
+The repo ships a `Dockerfile`, `nginx.conf`, and `docker-compose.yml` so
+BreathBase can run on its own VM and sit behind a dedicated edge VM that
+runs Caddy (TLS termination, HTTP→HTTPS, certs). Both VMs live on the
+same internal network; only the Caddy VM exposes 80/443 to the outside.
+
+```
+   internet ──443──▶  Caddy VM  ──8080──▶  BreathBase VM (nginx :8080)
+                       (TLS)              (Docker container)
+```
+
+### On the BreathBase VM
+
+Prerequisites: Docker Engine + the compose plugin.
+
+```bash
+git clone https://github.com/martinhv/breathbase.git
+cd breathbase
+cp deploy/.env.production.example .env
+# fill in your VITE_FIREBASE_* values (they're baked in at build time)
+
+docker compose up -d --build
+```
+
+The container listens on `0.0.0.0:8080`. Lock it down with the Proxmox
+firewall (or `ufw` inside the VM) so only the Caddy VM's address can
+reach `:8080` — otherwise anyone on the LAN can hit it bypassing TLS.
+
+`GET /healthz` returns `200 ok`; Caddy's `lb_try_duration` and Docker's
+own `HEALTHCHECK` both poll it.
+
+### On the Caddy VM
+
+Drop this site block into the Caddyfile (substitute your domain and the
+BreathBase VM's address):
+
+```caddyfile
+breathbase.example.com {
+    encode zstd gzip
+    reverse_proxy 10.0.0.42:8080 {
+        header_up X-Real-IP        {remote_host}
+        header_up X-Forwarded-For  {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+```
+
+Then `caddy reload` (or restart the Caddy service). Caddy will fetch a
+Let's Encrypt cert on first request.
+
+If you serve the app from a domain other than `localhost`, add it under
+**Firebase Console → Authentication → Settings → Authorized domains** so
+Google sign-in is allowed there.
+
+### Updating
+
+```bash
+cd ~/breathbase
+git pull
+docker compose up -d --build
+```
+
+The build runs inside the container — the VM only needs Docker, not Node.
+
+### Caching behavior
+
+`nginx.conf` already sets cache headers appropriate for a PWA:
+
+- **`/assets/*`** (Vite content-hashed) → `immutable, 1 year`
+- **`/voice/*`** (pre-rendered MP3 clips) → `public, 30 days`
+- **`/index.html`, `/manifest.webmanifest`** → `no-cache` (revalidate)
+- **`/sw.js`, `/firebase-messaging-sw.js`, `/workbox-*.js`** →
+  `no-cache, no-store` so a deploy is never blocked by a stale service
+  worker
+
+Caddy passes these through unchanged; you don't need to duplicate them
+in the Caddyfile.
+
+---
+
 ## Tech stack
 
 - **React 18 + TypeScript** via Vite
