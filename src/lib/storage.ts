@@ -37,6 +37,7 @@ export type SessionEntry = {
 
 export type Theme = "dark" | "light" | "auto";
 export type ReducedMotionPref = "auto" | "on" | "off";
+export type Soundscape = "piano" | "ocean" | "rain" | "brown" | "silent";
 
 export type Settings = {
   voiceEnabled: boolean;
@@ -45,6 +46,8 @@ export type Settings = {
   /** Whisper-style countdown of the remaining seconds in each phase. */
   countdownEnabled: boolean;
   musicEnabled: boolean;
+  /** Which audio bed to play during sessions when music is enabled. */
+  soundscape: Soundscape;
   chimesEnabled: boolean;
   hapticsEnabled: boolean;
   /** Linear 0..1 multipliers. */
@@ -58,6 +61,10 @@ export type Settings = {
   durationOverrides: Record<string, number>;
   /** Seven-day guided program state. See lib/program.ts. */
   program: ProgramState;
+  /** Daily practice reminder — fires while the tab is open at this time. */
+  reminderEnabled: boolean;
+  /** "HH:MM" in 24h format. */
+  reminderTime: string;
   onboarded: boolean;
   disclaimerAcknowledged: boolean;
 };
@@ -67,6 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceProfile: DEFAULT_VOICE_PROFILE,
   countdownEnabled: true,
   musicEnabled: true,
+  soundscape: "piano",
   chimesEnabled: true,
   hapticsEnabled: true,
   masterVolume: 0.8,
@@ -77,6 +85,8 @@ export const DEFAULT_SETTINGS: Settings = {
   reducedMotion: "auto",
   durationOverrides: {},
   program: DEFAULT_PROGRAM_STATE,
+  reminderEnabled: false,
+  reminderTime: "08:00",
   onboarded: false,
   disclaimerAcknowledged: false,
 };
@@ -93,7 +103,14 @@ const sessionsCol = (uid: string) => collection(db, "users", uid, "sessions");
 export const loadSettings = async (uid: string): Promise<Settings> => {
   const snap = await getDoc(settingsDoc(uid));
   if (!snap.exists()) return DEFAULT_SETTINGS;
-  return { ...DEFAULT_SETTINGS, ...(snap.data() as Partial<Settings>) };
+  const data = snap.data() as Partial<Settings>;
+  // Defensive merge on nested objects so a stored doc that predates a new
+  // field (e.g. program.programId) still picks up defaults for what's missing.
+  return {
+    ...DEFAULT_SETTINGS,
+    ...data,
+    program: { ...DEFAULT_PROGRAM_STATE, ...(data.program ?? {}) },
+  };
 };
 
 export const saveSettings = async (uid: string, s: Settings): Promise<void> => {

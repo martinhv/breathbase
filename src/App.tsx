@@ -10,6 +10,7 @@ import {
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider, useSettings } from "@/lib/settings";
 import { applyTheme, subscribeSystemTheme } from "@/lib/theme";
+import { cancelReminder, scheduleReminder } from "@/lib/notifications";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { Home } from "@/pages/Home";
@@ -49,6 +50,16 @@ function SignedInApp() {
     if (settings.theme !== "auto") return;
     return subscribeSystemTheme(() => applyTheme(settings.theme));
   }, [settings.theme]);
+
+  // Daily practice reminder. Re-arms whenever the toggle or time changes.
+  useEffect(() => {
+    if (settings.reminderEnabled) {
+      scheduleReminder(settings.reminderTime);
+    } else {
+      cancelReminder();
+    }
+    return cancelReminder;
+  }, [settings.reminderEnabled, settings.reminderTime]);
 
   useEffect(() => {
     if (!hydrated) return;

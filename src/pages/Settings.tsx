@@ -1,14 +1,57 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useSettings } from "@/lib/settings";
 import { useAuth } from "@/lib/auth";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
-import { exportAllUserData } from "@/lib/storage";
+import { exportAllUserData, type Soundscape } from "@/lib/storage";
 import { TECHNIQUES } from "@/lib/techniques";
 import { VOICE_PROFILES } from "@/lib/voiceProfiles";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
+import {
+  getPermission as getNotificationPermission,
+  isSupported as notificationsSupported,
+  requestPermission as requestNotificationPermission,
+} from "@/lib/notifications";
+
+const SOUNDSCAPE_OPTIONS: {
+  id: Soundscape;
+  emoji: string;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "piano",
+    emoji: "🎹",
+    label: "Piano ensemble",
+    description: "Salamander grand with strings, cello, pad, and bell.",
+  },
+  {
+    id: "ocean",
+    emoji: "🌊",
+    label: "Ocean",
+    description: "Slow wave-like swells of filtered noise.",
+  },
+  {
+    id: "rain",
+    emoji: "🌧️",
+    label: "Rain",
+    description: "Steady high-frequency wash. Even and enveloping.",
+  },
+  {
+    id: "brown",
+    emoji: "🟫",
+    label: "Brown noise",
+    description: "Deep, full-spectrum hum. Great for masking distractions.",
+  },
+  {
+    id: "silent",
+    emoji: "🔇",
+    label: "Silent",
+    description: "No bed at all — chimes and voice still fire on phase changes.",
+  },
+];
 
 // -- shared subcomponents --------------------------------------------------
 
@@ -119,6 +162,15 @@ export function Settings() {
   const [testing, setTesting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
+    () => getNotificationPermission(),
+  );
+
+  // Re-poll when the user toggles reminders on/off (in case browser dialog
+  // updates permission via the prompt below).
+  useEffect(() => {
+    setNotifPermission(getNotificationPermission());
+  }, [settings.reminderEnabled]);
 
   const activeVoice = VOICE_PROFILES.find((v) => v.id === settings.voiceProfile);
 
@@ -247,6 +299,50 @@ export function Settings() {
           />
         </section>
 
+        {settings.musicEnabled && (
+          <Collapse
+            title="Soundscape"
+            hint={SOUNDSCAPE_OPTIONS.find((s) => s.id === settings.soundscape)?.label.toLowerCase()}
+          >
+            <div
+              role="radiogroup"
+              aria-label="Soundscape"
+              className="py-3 flex flex-col gap-2"
+            >
+              {SOUNDSCAPE_OPTIONS.map((s) => {
+                const active = settings.soundscape === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => update({ soundscape: s.id })}
+                    className={`flex items-start gap-3 px-3 py-2 rounded-xl border transition text-left ${
+                      active
+                        ? "bg-teal-400/10 border-teal-400/40"
+                        : "border-slate-900/10 dark:border-white/10 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <div className="text-2xl" aria-hidden>{s.emoji}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-800 dark:text-slate-200">
+                        {s.label}
+                      </div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                        {s.description}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed pb-3">
+              Applies to the next session — your current session keeps its
+              current soundscape.
+            </p>
+          </Collapse>
+        )}
+
         {settings.voiceEnabled && (
           <Collapse
             title="Voice"
@@ -359,6 +455,53 @@ export function Settings() {
                 />
               );
             })}
+          </div>
+        </Collapse>
+
+        <Collapse
+          title="Reminders"
+          hint={
+            settings.reminderEnabled
+              ? `daily · ${settings.reminderTime}`
+              : "off"
+          }
+        >
+          <div className="divide-y divide-slate-900/5 dark:divide-white/5">
+            <Toggle
+              label="Daily practice reminder"
+              checked={settings.reminderEnabled}
+              onChange={async (v) => {
+                if (v) {
+                  const result = await requestNotificationPermission();
+                  setNotifPermission(result);
+                  if (result !== "granted") {
+                    // Don't enable if the user denied or the browser blocked.
+                    return;
+                  }
+                }
+                update({ reminderEnabled: v });
+              }}
+            />
+            {settings.reminderEnabled && (
+              <label className="flex items-center justify-between py-3">
+                <span className="text-slate-800 dark:text-slate-200">Time</span>
+                <input
+                  type="time"
+                  value={settings.reminderTime}
+                  onChange={(e) =>
+                    update({ reminderTime: e.target.value || "08:00" })
+                  }
+                  className="bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 rounded-lg px-2 py-1 text-sm text-slate-800 dark:text-slate-200 tabular-nums"
+                />
+              </label>
+            )}
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed py-3">
+              {!notificationsSupported()
+                ? "Notifications aren't available in this browser."
+                : notifPermission === "denied"
+                  ? "Notifications are blocked. Enable them for breathbase.app in your browser settings, then re-enable here."
+                  : "Reminders fire only while BreathBase is open in a tab or installed as a home-screen app. Background reminders need server-side push (a future addition)."}
+            </p>
           </div>
         </Collapse>
 

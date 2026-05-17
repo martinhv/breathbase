@@ -12,7 +12,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
 import {
-  PROGRAM_LENGTH,
+  getProgram,
   getProgramDay,
   isProgramComplete,
   nextProgramDay,
@@ -53,10 +53,12 @@ function ProgramTile() {
     );
   }
 
+  const selected = getProgram(program.programId);
   const complete = isProgramComplete(program);
   const next = nextProgramDay(program);
-  const day = next != null ? getProgramDay(next) : null;
+  const day = next != null ? getProgramDay(program.programId, next) : null;
   const doneCount = program.completedDays.length;
+  const length = selected.days.length;
 
   return (
     <Link
@@ -64,27 +66,27 @@ function ProgramTile() {
       className="block mb-3 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 hover:bg-slate-900/5 dark:hover:bg-white/10 transition"
     >
       <div className="flex items-center gap-3">
-        <div className="text-2xl">🗓️</div>
+        <div className="text-2xl">{selected.emoji}</div>
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-widest text-teal-300/80">
             {complete
-              ? "Program complete"
-              : `Day ${next} of ${PROGRAM_LENGTH}`}
+              ? `${selected.name} · complete`
+              : `${selected.name} · day ${next} of ${length}`}
           </div>
           <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
             {complete
-              ? "Seven days finished"
+              ? "Pick another program"
               : (day?.headline ?? "Continue program")}
           </div>
         </div>
         <div className="text-xs text-slate-600 dark:text-slate-400 tabular-nums">
-          {doneCount}/{PROGRAM_LENGTH}
+          {doneCount}/{length}
         </div>
       </div>
       <div className="h-1 rounded-full bg-slate-900/10 dark:bg-white/10 mt-3 overflow-hidden">
         <div
           className="h-full bg-teal-400/90 transition-all"
-          style={{ width: `${(doneCount / PROGRAM_LENGTH) * 100}%` }}
+          style={{ width: `${(doneCount / length) * 100}%` }}
         />
       </div>
     </Link>

@@ -3,6 +3,7 @@ import * as Tone from "tone";
 import { useSettings } from "@/lib/settings";
 import { DEFAULT_SETTINGS, type Settings } from "@/lib/storage";
 import { DEFAULT_CHIME_HZ, type PhaseKind } from "@/lib/techniques";
+import type { Soundscape } from "@/lib/storage";
 
 /**
  * Module-level audio engine singleton.
@@ -125,6 +126,19 @@ class AudioEngineImpl {
   private noiseVolume: Tone.Volume | null = null;
   private bell: Tone.FMSynth | null = null;
   private bellVolume: Tone.Volume | null = null;
+  // Soundscape alternatives — built once, gated by Volume nodes that stay at
+  // -Infinity except for the active soundscape. Lets users pick a non-piano
+  // bed (ocean, rain, brown noise, silent) without rebuilding the graph.
+  private oceanNoise: Tone.Noise | null = null;
+  private oceanFilter: Tone.Filter | null = null;
+  private oceanTremolo: Tone.Tremolo | null = null;
+  private oceanFilterLfo: Tone.LFO | null = null;
+  private oceanVolume: Tone.Volume | null = null;
+  private rainNoise: Tone.Noise | null = null;
+  private rainFilter: Tone.Filter | null = null;
+  private rainVolume: Tone.Volume | null = null;
+  private brown: Tone.Noise | null = null;
+  private brownVolume: Tone.Volume | null = null;
   private snare: Tone.NoiseSynth | null = null;
   private snareFilter: Tone.Filter | null = null;
   private snareVolume: Tone.Volume | null = null;
@@ -316,6 +330,50 @@ class AudioEngineImpl {
       oscillator: { type: "sine" },
       envelope: { attack: 0.02, decay: 0.4, sustain: 0, release: 1.6 },
     }).connect(this.chimeVolume);
+
+    // ── Soundscape: Ocean ──────────────────────────────────────────────
+    // Pink noise through a low-pass + slow tremolo + LFO-swept filter to
+    // produce wave-like swells. Tremolo period ~8 s; filter sweeps ~12 s.
+    this.oceanVolume = new Tone.Volume(-Infinity).connect(this.pianoVolume);
+    this.oceanTremolo = new Tone.Tremolo({
+      frequency: 0.12,
+      depth: 0.55,
+      type: "sine",
+    })
+      .connect(this.oceanVolume)
+      .start();
+    this.oceanFilter = new Tone.Filter({
+      frequency: 600,
+      type: "lowpass",
+      Q: 1.2,
+    }).connect(this.oceanTremolo);
+    this.oceanFilterLfo = new Tone.LFO({
+      frequency: 0.08,
+      min: 300,
+      max: 900,
+      type: "sine",
+    }).connect(this.oceanFilter.frequency);
+    this.oceanFilterLfo.start();
+    this.oceanNoise = new Tone.Noise("pink").connect(this.oceanFilter);
+    this.oceanNoise.start();
+
+    // ── Soundscape: Rain ───────────────────────────────────────────────
+    // White noise highpassed to bring up the hiss of rainfall. Steady level
+    // (no tremolo) — rain has its own micro-texture from white noise itself.
+    this.rainVolume = new Tone.Volume(-Infinity).connect(this.pianoVolume);
+    this.rainFilter = new Tone.Filter({
+      frequency: 1800,
+      type: "highpass",
+      Q: 0.8,
+    }).connect(this.rainVolume);
+    this.rainNoise = new Tone.Noise("white").connect(this.rainFilter);
+    this.rainNoise.start();
+
+    // ── Soundscape: Brown noise ────────────────────────────────────────
+    // The deepest, most enveloping of the noises — pure brown, no shaping.
+    this.brownVolume = new Tone.Volume(-Infinity).connect(this.pianoVolume);
+    this.brown = new Tone.Noise("brown").connect(this.brownVolume);
+    this.brown.start();
   }
 
   /** Attack the next chord across all sustained voices (cello / pad /
@@ -462,8 +520,12 @@ class AudioEngineImpl {
       );
   }
 
-  /** Begin a musical session. Resets the progression and plays an opening
-   * voicing softly during the ready countdown. */
+  private currentSoundscape(): Soundscape {
+    return this.settings.soundscape ?? "piano";
+  }
+
+  /** Begin a musical session. The active soundscape decides what plays:
+   *  piano (the full ensemble) or one of the noise-based beds. */
   startMusic(): void {
     if (this.musicPlaying) return;
     if (!this.settings.musicEnabled) {
@@ -477,25 +539,39 @@ class AudioEngineImpl {
       return;
     }
     // eslint-disable-next-line no-console
-    console.info("[audio] startMusic");
+    console.info("[audio] startMusic", this.currentSoundscape());
     this.musicPlaying = true;
     this.chordIdx = 0;
     this.passIndex = 0;
     this.lastCycleNumber = 0;
     this.lastWasCycle = null;
-    // Soft intro chord at low velocity — sits under the "Get ready" countdown.
-    if (this.piano.loaded) {
-      const chord = PROGRESSION[0];
-      const t = Tone.now();
-      this.piano.triggerAttackRelease(chord.bass, 4, t, 0.35);
-      this.piano.triggerAttackRelease(chord.notes.slice(0, 3), 4, t + 0.15, 0.25);
+
+    const scape = this.currentSoundscape();
+    if (scape === "piano") {
+      // Soft intro chord at low velocity — sits under the "Get ready" countdown.
+      if (this.piano.loaded) {
+        const chord = PROGRESSION[0];
+        const t = Tone.now();
+        this.piano.triggerAttackRelease(chord.bass, 4, t, 0.35);
+        this.piano.triggerAttackRelease(chord.notes.slice(0, 3), 4, t + 0.15, 0.25);
+      }
+      // Ambient ensemble: cello / pad / strings all attack the opening chord
+      // (slow attacks mean they swell under the intro), noise fades in over
+      // the prelude, and a gentle bell rings as a "we're starting" cue.
+      this.triggerHarmony(PROGRESSION[0]);
+      if (this.noiseVolume) this.noiseVolume.volume.rampTo(-30, 2.5);
+      this.triggerBell(0.3);
+    } else if (scape === "ocean") {
+      // Ramp the ocean bed in over the prelude.
+      if (this.oceanVolume) this.oceanVolume.volume.rampTo(-12, 2.5);
+    } else if (scape === "rain") {
+      if (this.rainVolume) this.rainVolume.volume.rampTo(-22, 2.5);
+    } else if (scape === "brown") {
+      if (this.brownVolume) this.brownVolume.volume.rampTo(-18, 2.5);
     }
-    // Ambient ensemble: cello / pad / strings all attack the opening chord
-    // (slow attacks mean they swell under the intro), noise fades in over
-    // the prelude, and a gentle bell rings as a "we're starting" cue.
-    this.triggerHarmony(PROGRESSION[0]);
-    if (this.noiseVolume) this.noiseVolume.volume.rampTo(-30, 2.5);
-    this.triggerBell(0.3);
+    // "silent" → musicPlaying is true so stopMusic/cleanup paths still run,
+    // but nothing audible plays from the music bus. Chimes and voice still
+    // fire normally on phase changes.
   }
 
   stopMusic(): void {
@@ -503,8 +579,11 @@ class AudioEngineImpl {
     this.musicPlaying = false;
     this.piano?.releaseAll();
     this.releaseHarmony();
-    if (this.noiseVolume)
-      this.noiseVolume.volume.rampTo(-Infinity, 0.3);
+    if (this.noiseVolume) this.noiseVolume.volume.rampTo(-Infinity, 0.3);
+    // Mute any soundscape that might be playing.
+    if (this.oceanVolume) this.oceanVolume.volume.rampTo(-Infinity, 0.3);
+    if (this.rainVolume) this.rainVolume.volume.rampTo(-Infinity, 0.3);
+    if (this.brownVolume) this.brownVolume.volume.rampTo(-Infinity, 0.3);
   }
 
   /**
@@ -532,6 +611,9 @@ class AudioEngineImpl {
         this.piano?.releaseAll();
         this.releaseHarmony();
         if (this.noiseVolume) this.noiseVolume.volume.value = -Infinity;
+        if (this.oceanVolume) this.oceanVolume.volume.value = -Infinity;
+        if (this.rainVolume) this.rainVolume.volume.value = -Infinity;
+        if (this.brownVolume) this.brownVolume.volume.value = -Infinity;
         if (this.pianoVolume) this.pianoVolume.volume.value = restoreDb;
       },
       Math.ceil(seconds * 1000) + 50,
@@ -553,8 +635,11 @@ class AudioEngineImpl {
     cycleNumber: number,
   ): void {
     if (!this.musicPlaying) return;
-    if (!this.piano || !this.piano.loaded) return;
     if (!this.settings.musicEnabled) return;
+    // Non-piano soundscapes don't play chord-driven phrases. The bed runs
+    // continuously; chimes still fire from playChime() independently.
+    if (this.currentSoundscape() !== "piano") return;
+    if (!this.piano || !this.piano.loaded) return;
 
     // Round-boundary detection: a brushed snare swell marks the transition
     // when we cross between active cycling (cycleNumber > 0) and a rest /
