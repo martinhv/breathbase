@@ -73,6 +73,10 @@ export type Settings = {
   /** Opt-out for the self-hosted Umami analytics. No-op when the build
    *  wasn't configured with VITE_UMAMI_* anyway. Default on. */
   analyticsEnabled: boolean;
+  /** Trim the piano ensemble for low-power devices: drops the strings layer,
+   *  chorus effect, and air noise; caps polyphony; uses a shorter reverb tail.
+   *  "auto" detects coarse pointers (phones/tablets) and enables lite mode. */
+  liteMusicMode: "auto" | "on" | "off";
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -97,6 +101,7 @@ export const DEFAULT_SETTINGS: Settings = {
   onboarded: false,
   disclaimerAcknowledged: false,
   analyticsEnabled: true,
+  liteMusicMode: "auto",
 };
 
 const HISTORY_LIMIT = 200; // cap reads to last 200 sessions

@@ -153,8 +153,27 @@ class AudioEngineImpl {
    * Phrase shapes use `passIndex % 2` to re-voice on alternate loops. */
   private passIndex = 0;
   private lastCycleNumber = 0;
+  /** The lite-mode flag captured at the last buildGraph(). When the resolved
+   * preference changes (e.g. user flips the setting), unlock() disposes the
+   * graph so buildGraph() can re-run with the new layer set. */
+  private currentLiteMode = false;
 
   private settings: Settings = DEFAULT_SETTINGS;
+
+  /** Resolve the user's liteMusicMode preference into an effective boolean.
+   * "auto" treats coarse-pointer devices (phones, most tablets) as lite —
+   * those are where the full ensemble produces audible underruns. */
+  private resolveLite(): boolean {
+    const pref = this.settings.liteMusicMode ?? "auto";
+    if (pref === "on") return true;
+    if (pref === "off") return false;
+    if (typeof window === "undefined") return false;
+    try {
+      return window.matchMedia("(pointer: coarse)").matches;
+    } catch {
+      return false;
+    }
+  }
 
   /**
    * Build the audio graph. Idempotent. Called from `unlock()` after
@@ -171,8 +190,14 @@ class AudioEngineImpl {
   private buildGraph(): void {
     if (this.piano) return;
     const s = this.settings;
+    const lite = this.resolveLite();
+    this.currentLiteMode = lite;
     this.master = new Tone.Volume(linearToDb(s.masterVolume)).toDestination();
-    this.reverb = new Tone.Reverb({ decay: 6, wet: 0.35 }).connect(this.master);
+    // Lite mode: shorter reverb tail (less convolution work per render quantum).
+    this.reverb = new Tone.Reverb({
+      decay: lite ? 2.5 : 6,
+      wet: lite ? 0.2 : 0.35,
+    }).connect(this.master);
     this.pianoVolume = new Tone.Volume(
       s.musicEnabled ? linearToDb(s.musicVolume) : -Infinity,
     ).connect(this.reverb);
@@ -212,9 +237,15 @@ class AudioEngineImpl {
       Q: 1,
     }).connect(this.celloVolume);
     this.cello = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "fatsawtooth", count: 2, spread: 12 },
+      // Lite: plain saw (1 osc) instead of 2-osc fatsaw.
+      oscillator: lite
+        ? { type: "sawtooth" }
+        : { type: "fatsawtooth", count: 2, spread: 12 },
       envelope: { attack: 3, decay: 1.2, sustain: 0.75, release: 6 },
     }).connect(this.celloFilter);
+    // Cap voice allocation tight — cello only ever holds a single note at a
+    // time, so the default 32-voice ceiling is wasted on mobile.
+    this.cello.maxPolyphony = lite ? 1 : 4;
     this.cello.volume.value = -4;
 
     // ── Pad layer (choir-like, mid register) ───────────────────────────
@@ -226,17 +257,26 @@ class AudioEngineImpl {
       type: "lowpass",
       Q: 0.8,
     }).connect(this.padVolume);
-    this.padLfo = new Tone.LFO({
-      frequency: 0.07,
-      min: 400,
-      max: 1100,
-      type: "sine",
-    }).connect(this.padFilter.frequency);
-    this.padLfo.start();
+    // Skip the LFO in lite mode — modulating a Filter's frequency from an LFO
+    // at audio rate is cheap, but it's one more graph node we don't need.
+    if (!lite) {
+      this.padLfo = new Tone.LFO({
+        frequency: 0.07,
+        min: 400,
+        max: 1100,
+        type: "sine",
+      }).connect(this.padFilter.frequency);
+      this.padLfo.start();
+    }
     this.pad = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "fattriangle", count: 3, spread: 18 },
+      oscillator: lite
+        ? { type: "triangle" }
+        : { type: "fattriangle", count: 3, spread: 18 },
       envelope: { attack: 3, decay: 1.5, sustain: 0.8, release: 5 },
     }).connect(this.padFilter);
+    // Pad holds at most 2 chord tones — cap polyphony tight to avoid the
+    // default 32-voice ceiling allocating idle voices.
+    this.pad.maxPolyphony = lite ? 2 : 4;
     // PolySynth's per-voice volume is a touch hot at default; tame it here.
     this.pad.volume.value = -6;
 
@@ -244,52 +284,58 @@ class AudioEngineImpl {
     // Fat-saw PolySynth through chorus + filter LFO — gives an ensemble
     // bowed-string character. Plays the top of the chord and swells with
     // each chord change, the most audible "instrumentation" addition.
-    this.stringsVolume = new Tone.Volume(-20).connect(this.pianoVolume);
-    this.stringsChorus = new Tone.Chorus({
-      frequency: 0.6,
-      delayTime: 4,
-      depth: 0.5,
-      spread: 180,
-      wet: 0.4,
-    })
-      .connect(this.stringsVolume)
-      .start();
-    this.stringsFilter = new Tone.Filter({
-      frequency: 1400,
-      type: "lowpass",
-      Q: 0.7,
-    }).connect(this.stringsChorus);
-    this.stringsLfo = new Tone.LFO({
-      frequency: 0.05,
-      min: 900,
-      max: 2000,
-      type: "sine",
-    }).connect(this.stringsFilter.frequency);
-    this.stringsLfo.start();
-    this.strings = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "fatsawtooth", count: 3, spread: 28 },
-      envelope: { attack: 1.5, decay: 0.8, sustain: 0.75, release: 4 },
-    }).connect(this.stringsFilter);
-    this.strings.volume.value = -8;
+    // Skipped entirely in lite mode (chorus + 3-osc fatsaw × 3 voices is
+    // the single most expensive part of the graph on mobile).
+    if (!lite) {
+      this.stringsVolume = new Tone.Volume(-20).connect(this.pianoVolume);
+      this.stringsChorus = new Tone.Chorus({
+        frequency: 0.6,
+        delayTime: 4,
+        depth: 0.5,
+        spread: 180,
+        wet: 0.4,
+      })
+        .connect(this.stringsVolume)
+        .start();
+      this.stringsFilter = new Tone.Filter({
+        frequency: 1400,
+        type: "lowpass",
+        Q: 0.7,
+      }).connect(this.stringsChorus);
+      this.stringsLfo = new Tone.LFO({
+        frequency: 0.05,
+        min: 900,
+        max: 2000,
+        type: "sine",
+      }).connect(this.stringsFilter.frequency);
+      this.stringsLfo.start();
+      this.strings = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "fatsawtooth", count: 3, spread: 28 },
+        envelope: { attack: 1.5, decay: 0.8, sustain: 0.75, release: 4 },
+      }).connect(this.stringsFilter);
+      this.strings.volume.value = -8;
+    }
 
     // ── Air layer ──────────────────────────────────────────────────────
     // Band-passed pink noise — adds organic "presence" without timbre.
-    // Starts silenced; startMusic() fades it in.
-    this.noiseVolume = new Tone.Volume(-Infinity).connect(this.pianoVolume);
-    this.noiseFilter = new Tone.Filter({
-      frequency: 700,
-      type: "bandpass",
-      Q: 1.5,
-    }).connect(this.noiseVolume);
-    this.noiseLfo = new Tone.LFO({
-      frequency: 0.04,
-      min: 400,
-      max: 1400,
-      type: "sine",
-    }).connect(this.noiseFilter.frequency);
-    this.noiseLfo.start();
-    this.noise = new Tone.Noise("pink").connect(this.noiseFilter);
-    this.noise.start();
+    // Starts silenced; startMusic() fades it in. Skipped in lite mode.
+    if (!lite) {
+      this.noiseVolume = new Tone.Volume(-Infinity).connect(this.pianoVolume);
+      this.noiseFilter = new Tone.Filter({
+        frequency: 700,
+        type: "bandpass",
+        Q: 1.5,
+      }).connect(this.noiseVolume);
+      this.noiseLfo = new Tone.LFO({
+        frequency: 0.04,
+        min: 400,
+        max: 1400,
+        type: "sine",
+      }).connect(this.noiseFilter.frequency);
+      this.noiseLfo.start();
+      this.noise = new Tone.Noise("pink").connect(this.noiseFilter);
+      this.noise.start();
+    }
 
     // ── Snare layer ────────────────────────────────────────────────────
     // Brushed-snare swell. Pink noise through a band-pass for the "brush"
@@ -494,11 +540,59 @@ class AudioEngineImpl {
     }
   }
 
+  /** Tear down the whole audio graph. Used when the resolved lite-mode flag
+   * changes between sessions — buildGraph() will reconstruct with the new
+   * layer set on the next unlock(). Safe to call multiple times. */
+  private disposeGraph(): void {
+    const nodes: (Tone.ToneAudioNode | null)[] = [
+      this.piano, this.pianoVolume, this.reverb,
+      this.chime, this.chimeVolume, this.master,
+      this.pad, this.padFilter, this.padLfo, this.padVolume,
+      this.strings, this.stringsFilter, this.stringsLfo,
+      this.stringsChorus, this.stringsVolume,
+      this.cello, this.celloFilter, this.celloVolume,
+      this.noise, this.noiseFilter, this.noiseLfo, this.noiseVolume,
+      this.bell, this.bellVolume,
+      this.oceanNoise, this.oceanFilter, this.oceanTremolo,
+      this.oceanFilterLfo, this.oceanVolume,
+      this.rainNoise, this.rainFilter, this.rainVolume,
+      this.brown, this.brownVolume,
+      this.snare, this.snareFilter, this.snareVolume,
+    ];
+    for (const n of nodes) {
+      try { n?.dispose(); } catch { /* noop */ }
+    }
+    this.piano = null;
+    this.pianoVolume = null; this.reverb = null;
+    this.chime = null; this.chimeVolume = null; this.master = null;
+    this.pad = null; this.padFilter = null; this.padLfo = null; this.padVolume = null;
+    this.strings = null; this.stringsFilter = null; this.stringsLfo = null;
+    this.stringsChorus = null; this.stringsVolume = null;
+    this.cello = null; this.celloFilter = null; this.celloVolume = null;
+    this.noise = null; this.noiseFilter = null; this.noiseLfo = null; this.noiseVolume = null;
+    this.bell = null; this.bellVolume = null;
+    this.oceanNoise = null; this.oceanFilter = null; this.oceanTremolo = null;
+    this.oceanFilterLfo = null; this.oceanVolume = null;
+    this.rainNoise = null; this.rainFilter = null; this.rainVolume = null;
+    this.brown = null; this.brownVolume = null;
+    this.snare = null; this.snareFilter = null; this.snareVolume = null;
+    this.padCurrentNotes = [];
+    this.stringsCurrentNotes = [];
+    this.celloCurrentNote = null;
+  }
+
   async unlock(): Promise<void> {
     try {
       await Tone.start();
     } catch {
       /* AudioContext may already be running. */
+    }
+    // If the user flipped the lite-mode setting since the last build, throw
+    // out the old graph so buildGraph() can reconstruct with the new layers.
+    // We only do this when music isn't actively playing to avoid mid-session
+    // audio drops.
+    if (this.piano && !this.musicPlaying && this.resolveLite() !== this.currentLiteMode) {
+      this.disposeGraph();
     }
     this.buildGraph();
     this.started = true;

@@ -382,9 +382,29 @@ export function Settings() {
                 );
               })}
             </div>
+            <label className="flex items-center justify-between py-3 border-t border-slate-900/5 dark:border-white/5">
+              <span className="text-slate-800 dark:text-slate-200">
+                Rich music
+              </span>
+              <select
+                value={settings.liteMusicMode}
+                onChange={(e) =>
+                  update({
+                    liteMusicMode: e.target.value as "auto" | "on" | "off",
+                  })
+                }
+                className="bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 rounded-lg px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
+              >
+                <option value="auto">Auto (lite on phones)</option>
+                <option value="off">Full ensemble</option>
+                <option value="on">Lite (recommended for mobile)</option>
+              </select>
+            </label>
             <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed pb-3">
-              Applies to the next session — your current session keeps its
-              current soundscape.
+              Lite mode drops the strings layer, chorus, and air noise to keep
+              the piano soundscape glitch-free on low-power devices. Applies
+              to the next session — your current session keeps its current
+              soundscape.
             </p>
           </Collapse>
         )}
