@@ -1,32 +1,40 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettings } from "@/lib/settings";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
+import { DEFAULT_VOICE_PROFILE } from "@/lib/voiceProfiles";
 import { enrollState } from "@/lib/program";
 import { track } from "@/lib/analytics";
 
+// Narration slugs match generate-onboarding-voice.sh. Files live at
+// public/voice/{DEFAULT_VOICE_PROFILE}/onboarding-{slug}.mp3 — onboarding is
+// pinned to the default voice since the user hasn't picked one yet.
 const SLIDES = [
   {
     icon: "🌬️",
     title: "Welcome to BreathBase",
     body: "Breathwork rooted in modern science.",
+    narration: "welcome",
   },
   {
     icon: "🧭",
     title: "Find what you need",
     body: "Themes on the home screen group techniques by goal — sleep, stress, focus, energy. Or browse the full library by physiology.",
+    narration: "navigate",
   },
   {
     icon: "🌱",
     title: "Start small",
     body: "Five minutes a day. Consistency matters more than duration.",
+    narration: "start-small",
   },
   {
     icon: "🗓️",
     title: "A seven-day start",
     body: "We've laid out a one-week program — a different foundational practice each day. Pick it up on the home screen whenever you're ready.",
+    narration: "seven-day",
   },
 ];
 
@@ -34,10 +42,11 @@ export function Onboarding() {
   const [i, setI] = useState(0);
   const [videoEnded, setVideoEnded] = useState(false);
   const navigate = useNavigate();
-  const { update } = useSettings();
+  const { settings, update } = useSettings();
   const reducedMotion = useReducedMotion();
   const audio = useAudioEngine();
   const audioStarted = useRef(false);
+  const narrationRef = useRef<HTMLAudioElement | null>(null);
   const isLast = i === SLIDES.length - 1;
   const hasVideoBg = i === 0;
 
@@ -51,8 +60,29 @@ export function Onboarding() {
     void audio.unlock().then(() => audio.startMusic());
   };
 
+  // Play per-slide narration. The first slide's clip will likely be blocked
+  // by browser autoplay (no gesture yet) — the .catch() swallows that;
+  // subsequent slides play because the Next tap counts as a gesture.
+  useEffect(() => {
+    const el = narrationRef.current;
+    if (!el) return;
+    el.pause();
+    if (!settings.voiceEnabled) return;
+    el.src = `/voice/${DEFAULT_VOICE_PROFILE}/onboarding-${SLIDES[i].narration}.mp3`;
+    el.currentTime = 0;
+    el.play().catch(() => { /* autoplay blocked — fall back to silent slide */ });
+  }, [i, settings.voiceEnabled]);
+
+  // Stop narration on unmount so it doesn't bleed into the next route.
+  useEffect(() => {
+    return () => {
+      narrationRef.current?.pause();
+    };
+  }, []);
+
   const finish = (skipped: boolean) => {
     if (audio.isMusicPlaying()) audio.fadeOutMusic(1.5);
+    narrationRef.current?.pause();
     update({ onboarded: true, program: enrollState() });
     track("onboarding_complete", { skipped });
     navigate("/", { replace: true });
@@ -110,6 +140,9 @@ export function Onboarding() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Hidden narration element — src swaps per slide via useEffect. */}
+      <audio ref={narrationRef} preload="auto" className="hidden" />
 
       {/* ── Content ──────────────────────────────────────────────────── */}
       <div className="relative flex flex-col h-full safe-top safe-bottom px-6 pb-8 max-w-md mx-auto w-full">
