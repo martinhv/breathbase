@@ -740,6 +740,14 @@ export function Settings() {
         >
           {LICENSE_NAME}
         </a>
+        {" · "}
+        <Link to="/impressum" className="underline-offset-2 hover:underline">
+          Impressum
+        </Link>
+        {" · "}
+        <Link to="/privacy" className="underline-offset-2 hover:underline">
+          Privacy
+        </Link>
       </footer>
 
       <DisclaimerModal

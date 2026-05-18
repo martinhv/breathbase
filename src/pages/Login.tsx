@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
 import { track } from "@/lib/analytics";
@@ -243,6 +244,14 @@ export function Login() {
           >
             {LICENSE_NAME}
           </a>
+          {" · "}
+          <Link to="/impressum" className="underline-offset-2 hover:underline">
+            Impressum
+          </Link>
+          {" · "}
+          <Link to="/privacy" className="underline-offset-2 hover:underline">
+            Privacy
+          </Link>
         </p>
       </div>
     </div>

@@ -28,6 +28,8 @@ import { History } from "@/pages/History";
 import { Program } from "@/pages/Program";
 import { Theme } from "@/pages/Theme";
 import { Library } from "@/pages/Library";
+import { Impressum } from "@/pages/Impressum";
+import { Privacy } from "@/pages/Privacy";
 
 function LoadingShell() {
   return (
@@ -141,7 +143,13 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AuthGate />
+        <Routes>
+          {/* Legal pages are reachable without sign-in so anonymous visitors
+              can find them — required for Impressum / GDPR. */}
+          <Route path="/impressum" element={<Impressum />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="*" element={<AuthGate />} />
+        </Routes>
       </BrowserRouter>
       <ReloadPrompt />
     </AuthProvider>
