@@ -518,6 +518,8 @@ or while operating vehicles or machinery.
 
 ## License
 
+Copyright © 2026 [Martin Hirschvogel](https://github.com/martinhv).
+
 BreathBase is licensed under the [GNU Affero General Public License
 v3.0 or later](LICENSE) (AGPL-3.0-or-later).
 

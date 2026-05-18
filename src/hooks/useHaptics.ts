@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useCallback } from "react";
 import { useSettings } from "@/lib/settings";
 

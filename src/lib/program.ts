@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Foundations — the single guided 7-day program. A curated tour of the
 // foundational techniques, one per day, in an order that introduces
 // complexity gradually: slow breath → resonance → symmetry with holds →

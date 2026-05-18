@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { motion } from "framer-motion";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { Category, PhaseKind } from "@/lib/techniques";

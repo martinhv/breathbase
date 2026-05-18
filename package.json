@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "description": "BreathBase — Foundational breathwork, grounded in science.",
+  "author": {
+    "name": "Martin Hirschvogel",
+    "url": "https://github.com/martinhv"
+  },
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",

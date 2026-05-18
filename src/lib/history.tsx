@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared history state. Loaded once per signed-in user and shared across
 // pages via context, so Home, History, Theme, Category, and Settings can
 // all read the same data without each page making its own Firestore round-

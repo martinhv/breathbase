@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared technique card used by Category and Theme pages.
 //
 // Renders the technique name + short description + rationale, a duration

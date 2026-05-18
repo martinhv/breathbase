@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";

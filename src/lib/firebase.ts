@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Firebase client initialization.
 //
 // Config is read from Vite env vars (VITE_FIREBASE_*) so secrets aren't

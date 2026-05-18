@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { Link } from "react-router-dom";
 import { CategoryCard } from "@/components/CategoryCard";
 import { CATEGORIES, CATEGORY_ORDER } from "@/lib/techniques";

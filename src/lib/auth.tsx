@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // AuthContext — wraps Firebase Auth with a tiny status-machine that the
 // rest of the app reads via `useAuth()`. The router uses `status` to decide
 // what to render (loading shell / login screen / actual app).

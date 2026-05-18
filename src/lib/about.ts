@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // App metadata for AGPL §13 attribution: anyone using the service over a
 // network must be offered access to the corresponding source code.
 

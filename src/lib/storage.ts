@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Per-user persistence for settings, session history, and derived stats.
 // All reads/writes are scoped to the caller-supplied UID.
 //

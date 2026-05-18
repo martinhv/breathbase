@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Tutorial narrations per technique. Each entry maps a technique id to the
 // spoken-tutorial transcript. The transcript is shown as text in the UI AND
 // rendered to mp3 by scripts/generate-tutorial-voice.sh — keep both in sync.

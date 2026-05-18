@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Themes — goal-driven groupings of techniques. Distinct from categories
 // (which group by physiology: down/upregulate/balance/focus) and from the
 // 7-day Foundations program (a curated sequential curriculum).
@@ -100,4 +103,3 @@ export function suggestedThemeForHour(hour: number): {
     return { id: "stress", period: "Late afternoon" };
   return { id: "sleep", period: "Evening" };
 }
-

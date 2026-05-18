@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Firebase Cloud Messaging client wrapper.
 //
 // When push is configured (VITE_FIREBASE_VAPID_KEY is set AND we're not in

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Available built-in voice profiles. Each profile has its own subdirectory
 // under public/voice/{id}/ with one mp3 per prompt slug.
 //
