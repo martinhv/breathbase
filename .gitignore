@@ -13,3 +13,5 @@ functions/.firebase
 .idea
 .claude
 *.tsbuildinfo
+
+tmp/
