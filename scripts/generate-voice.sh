@@ -10,9 +10,10 @@
 #   - ELEVENLABS_API_KEY env var (https://elevenlabs.io → profile → API key)
 #
 # Run from repo root:
-#     ./scripts/generate-voice.sh                  # all voices
-#     ./scripts/generate-voice.sh aria thomas      # specific voices
-#     ./scripts/generate-voice.sh oliver           # ElevenLabs voice only
+#     ./scripts/generate-voice.sh                  # all voices, all slugs
+#     ./scripts/generate-voice.sh aria thomas      # specific voices, all slugs
+#     ./scripts/generate-voice.sh priyanka -- hold # one voice, one slug (cheap)
+#     ./scripts/generate-voice.sh -- hold settle   # all voices, two slugs
 #
 # To list available edge-tts voices:
 #     edge-tts --list-voices | grep -i en-
@@ -69,7 +70,7 @@ prepare_elevenlabs_header() {
 declare -A PHRASES=(
   ["breathe-in"]="Breathe in"
   ["breathe-out"]="Breathe out"
-  ["hold"]="Hold"
+  ["hold"]="Hold."
   ["top-up"]="Top up"
   ["long-exhale"]="Long exhale"
   # "In." / "Out." (with period) — ElevenLabs treats single-token utterances
@@ -172,13 +173,28 @@ whisper_filter_for_count() {
     "$noise_weight"
 }
 
-# Filter voices if any args were passed.
-selected=("$@")
+# Parse args: positional args before `--` are voice ids, after `--` are slug
+# ids. Either list (or both) may be empty for "all".
+selected=()
+selected_slugs=()
+_in_slugs=false
+for _arg in "$@"; do
+  if [[ "$_arg" == "--" ]]; then _in_slugs=true; continue; fi
+  if $_in_slugs; then selected_slugs+=("$_arg"); else selected+=("$_arg"); fi
+done
 should_render() {
   local id="$1"
   if [[ ${#selected[@]} -eq 0 ]]; then return 0; fi
   for s in "${selected[@]}"; do
     if [[ "$s" == "$id" ]]; then return 0; fi
+  done
+  return 1
+}
+should_render_slug() {
+  local slug="$1"
+  if [[ ${#selected_slugs[@]} -eq 0 ]]; then return 0; fi
+  for s in "${selected_slugs[@]}"; do
+    if [[ "$s" == "$slug" ]]; then return 0; fi
   done
   return 1
 }
@@ -253,6 +269,7 @@ for entry in "${VOICES[@]}"; do
   mkdir -p "$out_dir"
   echo "=== $id ($engine: ${engine_params[*]}) ==="
   for slug in "${!PHRASES[@]}"; do
+    if ! should_render_slug "$slug"; then continue; fi
     phrase="${PHRASES[$slug]}"
     raw="$TMP_DIR/$id-$slug-raw.mp3"
     out="$out_dir/$slug.mp3"
