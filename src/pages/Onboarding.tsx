@@ -34,7 +34,7 @@ export function Onboarding() {
   const [i, setI] = useState(0);
   const [videoEnded, setVideoEnded] = useState(false);
   const navigate = useNavigate();
-  const { update } = useSettings();
+  const { settings, update } = useSettings();
   const reducedMotion = useReducedMotion();
   const audio = useAudioEngine();
   const audioStarted = useRef(false);
@@ -46,14 +46,11 @@ export function Onboarding() {
     return () => { mountedRef.current = false; };
   }, []);
 
-  // Unlock audio and start ambient music. Must be called from a user-gesture
-  // handler (browser autoplay policy). Mirrors the Session.tsx / TechniqueCard
-  // pattern of calling unlock() directly in the event handler.
   const startAudio = async () => {
     if (audioStarted.current) return;
     audioStarted.current = true;
     await audio.unlock();
-    if (mountedRef.current) audio.startMusic();
+    if (mountedRef.current && settings.musicEnabled) audio.startMusic();
   };
 
   const finish = (skipped: boolean) => {
@@ -75,14 +72,19 @@ export function Onboarding() {
   };
 
   return (
-    <div className="relative min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
+    // fixed inset-0 so we own the full viewport — avoids the body's
+    // background-attachment:fixed gradient painting over any child layers.
+    <div className="fixed inset-0 flex flex-col">
 
-      {/* Full-viewport video background on the first slide */}
+      {/* ── Background layers (slide 0 only) ────────────────────────── */}
+      {/* Dark base always present so the slide-exit fade lands on dark */}
+      <div className="absolute inset-0 bg-slate-950" />
+
       <AnimatePresence>
         {hasVideoBg && (
           <motion.div
             key="video-bg"
-            className="fixed inset-0 -z-10"
+            className="absolute inset-0"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -92,91 +94,91 @@ export function Onboarding() {
               <img
                 src="/welcome-bg-poster.jpg"
                 alt=""
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
               />
             ) : (
-              <>
-                <motion.video
-                  className="w-full h-full object-cover"
-                  src="/welcome-bg.mp4"
-                  autoPlay
-                  muted
-                  playsInline
-                  poster="/welcome-bg-poster.jpg"
-                  onEnded={() => setVideoEnded(true)}
-                  animate={{ opacity: videoEnded ? 0 : 1 }}
-                  transition={{ duration: 1.5 }}
-                />
-                {/* Dark base that shows through once the video fades out */}
-                <div className="absolute inset-0 -z-10 bg-slate-950" />
-              </>
+              <motion.video
+                className="absolute inset-0 w-full h-full object-cover"
+                src="/welcome-bg.mp4"
+                autoPlay
+                muted
+                playsInline
+                poster="/welcome-bg-poster.jpg"
+                onEnded={() => setVideoEnded(true)}
+                animate={{ opacity: videoEnded ? 0 : 1 }}
+                transition={{ duration: 1.5 }}
+              />
             )}
+            {/* Gradient overlay for text legibility */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/65" />
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="flex justify-end pt-2">
+      {/* ── Content ──────────────────────────────────────────────────── */}
+      <div className="relative flex flex-col h-full safe-top safe-bottom px-6 pb-8 max-w-md mx-auto w-full">
+        <div className="flex justify-end pt-2">
+          <button
+            onClick={skip}
+            className={`text-sm ${
+              hasVideoBg
+                ? "text-white/70 hover:text-white"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            Skip
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex flex-col items-center gap-5"
+            >
+              <div className="text-6xl">{SLIDES[i].icon}</div>
+              <h1 className={`text-3xl font-light ${hasVideoBg ? "text-white" : "dark:text-slate-100"}`}>
+                {SLIDES[i].title}
+              </h1>
+              <p
+                className={`leading-relaxed max-w-xs ${
+                  hasVideoBg
+                    ? "text-white/85"
+                    : "text-slate-700 dark:text-slate-300"
+                }`}
+              >
+                {SLIDES[i].body}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <div className="flex justify-center gap-2 mb-6">
+          {SLIDES.map((_, idx) => (
+            <div
+              key={idx}
+              className={`h-1.5 rounded-full transition-all ${
+                idx === i
+                  ? "w-8 bg-teal-400"
+                  : hasVideoBg
+                    ? "w-1.5 bg-white/35"
+                    : "w-1.5 bg-slate-900/10 dark:bg-white/20"
+              }`}
+            />
+          ))}
+        </div>
+
         <button
-          onClick={skip}
-          className={`text-sm ${
-            hasVideoBg
-              ? "text-white/70 hover:text-white"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-          }`}
+          onClick={next}
+          className="w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
-          Skip
+          {isLast ? "Begin" : "Next"}
         </button>
       </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center text-center">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            className="flex flex-col items-center gap-5"
-          >
-            <div className="text-6xl">{SLIDES[i].icon}</div>
-            <h1 className={`text-3xl font-light ${hasVideoBg ? "text-white" : ""}`}>
-              {SLIDES[i].title}
-            </h1>
-            <p
-              className={`leading-relaxed max-w-xs ${
-                hasVideoBg
-                  ? "text-white/85"
-                  : "text-slate-700 dark:text-slate-300"
-              }`}
-            >
-              {SLIDES[i].body}
-            </p>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      <div className="flex justify-center gap-2 mb-6">
-        {SLIDES.map((_, idx) => (
-          <div
-            key={idx}
-            className={`h-1.5 rounded-full transition-all ${
-              idx === i
-                ? "w-8 bg-teal-400"
-                : hasVideoBg
-                  ? "w-1.5 bg-white/35"
-                  : "w-1.5 bg-slate-900/10 dark:bg-white/20"
-            }`}
-          />
-        ))}
-      </div>
-
-      <button
-        onClick={next}
-        className="w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
-      >
-        {isLast ? "Begin" : "Next"}
-      </button>
     </div>
   );
 }
