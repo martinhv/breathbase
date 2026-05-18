@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Legal contact info read from VITE_LEGAL_* env vars at build time.
-// Values live in .env.local (gitignored) so personal/company details
-// stay out of the source repo. Pages render placeholder text when unset.
+// Values live in the build environment (.env / .env.local — both gitignored)
+// so personal/company details stay out of the source repo. Pages render a
+// clear placeholder when a value is unset.
 
 const env = import.meta.env;
 
 const fallback = (value: string | undefined, label: string): string =>
-  value && value.trim() ? value : `[${label} — set VITE_LEGAL_* in .env.local]`;
+  value && value.trim() ? value : `[${label} — VITE_LEGAL_* not configured]`;
 
 export const LEGAL = {
   company: fallback(env.VITE_LEGAL_COMPANY, "company"),

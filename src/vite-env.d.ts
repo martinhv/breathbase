@@ -11,7 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string;
 
   // Legal / Impressum / GDPR contact info. Filled in at build time from
-  // .env.local — never committed. Pages render placeholder text when unset.
+  // the build environment (.env / .env.local — both gitignored). Pages
+  // render placeholder text when unset.
   readonly VITE_LEGAL_COMPANY?: string;
   readonly VITE_LEGAL_ADDRESS_STREET?: string;
   readonly VITE_LEGAL_ADDRESS_CITY?: string;
