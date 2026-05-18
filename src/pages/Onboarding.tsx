@@ -20,9 +20,9 @@ const SLIDES = [
   },
   {
     icon: "🧭",
-    title: "Find what you need",
-    body: "Themes on the home screen group techniques by goal — sleep, stress, focus, energy. Or browse the full library by physiology.",
-    narration: "navigate",
+    title: "Many ways it helps",
+    body: "Calm stress. Sleep deeper. Sharpen focus. Find energy.",
+    narration: "help",
   },
   {
     icon: "🌱",

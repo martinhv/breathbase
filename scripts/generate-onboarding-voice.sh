@@ -37,11 +37,11 @@ declare -A VOICES=(
 )
 
 # Ordered list of slide slugs (bash assoc arrays don't preserve order).
-SLUGS=(welcome navigate start-small seven-day)
+SLUGS=(welcome help start-small seven-day)
 
 declare -A NARRATIONS=(
   [welcome]="Welcome to BreathBase. Breathwork is one of the simplest, most powerful tools we have to influence our nervous system — and modern research is catching up with what practitioners have known for centuries. Let's get you started."
-  [navigate]="On the home screen, themes group techniques by what you want — better sleep, less stress, more focus, or more energy. If you'd rather browse by what's happening in your body, the full library is organized by physiology."
+  [help]="BreathBase can help with many things. Calm yourself when stress builds. Settle into sleep when your mind won't quiet down. Sharpen your focus before something that matters. Or wake up your body when you're feeling flat. Each technique targets a specific response in your nervous system."
   [start-small]="Five minutes a day is enough. Consistency matters far more than duration — a short practice every morning will do more than an hour once a week."
   [seven-day]="We've laid out a one-week program — a different foundational practice each day, building from simple to more advanced. It's there on the home screen whenever you're ready to begin."
 )
