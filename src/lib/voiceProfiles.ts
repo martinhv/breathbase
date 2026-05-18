@@ -3,7 +3,7 @@
 //
 // To add a profile:
 //   1. Append an entry here.
-//   2. Add the same id + edge-tts voice name to scripts/generate-voice.sh.
+//   2. Add the same id + engine row to scripts/generate-voice.sh.
 //   3. Run ./scripts/generate-voice.sh and commit the new mp3s.
 
 export type VoiceProfile = {
@@ -13,44 +13,91 @@ export type VoiceProfile = {
   name: string;
   /** One-line description / accent + tone. */
   description: string;
-  /** edge-tts voice name (informational; not used at runtime). */
-  edgeVoice: string;
+  /** Source voice (edge-tts name or ElevenLabs voice id). Informational. */
+  sourceVoice: string;
 };
 
 export const VOICE_PROFILES: VoiceProfile[] = [
+  // Standard edge-tts voices temporarily disabled during premium-voice
+  // tuning. Re-enable by un-commenting; mp3 clips still exist under
+  // public/voice/{id}/ so no regeneration is needed.
+  // {
+  //   id: "aria",
+  //   name: "Aria",
+  //   description: "US English · calm, neutral",
+  //   sourceVoice: "en-US-AriaNeural",
+  // },
+  // {
+  //   id: "jenny",
+  //   name: "Jenny",
+  //   description: "US English · warm, friendly",
+  //   sourceVoice: "en-US-JennyNeural",
+  // },
+  // {
+  //   id: "guy",
+  //   name: "Guy",
+  //   description: "US English · male, steady",
+  //   sourceVoice: "en-US-GuyNeural",
+  // },
+  // {
+  //   id: "libby",
+  //   name: "Libby",
+  //   description: "British English · soft",
+  //   sourceVoice: "en-GB-LibbyNeural",
+  // },
+  // {
+  //   id: "thomas",
+  //   name: "Thomas",
+  //   description: "British English · deep, male",
+  //   sourceVoice: "en-GB-ThomasNeural",
+  // },
+  // Oliver and Bill temporarily disabled — clips remain under
+  // public/voice/{id}/ so un-commenting brings them back without regen.
+  // {
+  //   id: "oliver",
+  //   name: "Oliver",
+  //   description: "British English · warm male (premium)",
+  //   sourceVoice: "ElevenLabs · George",
+  // },
   {
-    id: "aria",
-    name: "Aria",
-    description: "US English · calm, neutral",
-    edgeVoice: "en-US-AriaNeural",
+    id: "sarah",
+    name: "Sarah",
+    description: "US English · calm female (premium)",
+    sourceVoice: "ElevenLabs · Sarah",
+  },
+  // {
+  //   id: "bill",
+  //   name: "Bill",
+  //   description: "US English · energetic male (premium)",
+  //   sourceVoice: "ElevenLabs · Bill",
+  // },
+  {
+    id: "theo",
+    name: "Theo",
+    description: "British English · deep, calm male (premium)",
+    sourceVoice: "ElevenLabs · Theo Silk",
   },
   {
-    id: "jenny",
-    name: "Jenny",
-    description: "US English · warm, friendly",
-    edgeVoice: "en-US-JennyNeural",
+    id: "priyanka",
+    name: "Priyanka",
+    description: "British English · velvety, calm female (premium)",
+    sourceVoice: "ElevenLabs · Priyanka Sogam",
   },
   {
-    id: "guy",
-    name: "Guy",
-    description: "US English · male, steady",
-    edgeVoice: "en-US-GuyNeural",
+    id: "brittney",
+    name: "Brittney",
+    description: "US English · soft, meditative female (premium)",
+    sourceVoice: "ElevenLabs · Brittney",
   },
   {
-    id: "libby",
-    name: "Libby",
-    description: "British English · soft",
-    edgeVoice: "en-GB-LibbyNeural",
-  },
-  {
-    id: "thomas",
-    name: "Thomas",
-    description: "British English · deep, male",
-    edgeVoice: "en-GB-ThomasNeural",
+    id: "christopher",
+    name: "Christopher",
+    description: "US English · intimate, meditative male (premium)",
+    sourceVoice: "ElevenLabs · Christopher",
   },
 ];
 
-export const DEFAULT_VOICE_PROFILE = "aria";
+export const DEFAULT_VOICE_PROFILE = "theo";
 
 export const findVoiceProfile = (id: string): VoiceProfile =>
   VOICE_PROFILES.find((v) => v.id === id) ??

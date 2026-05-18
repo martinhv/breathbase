@@ -71,7 +71,12 @@ Web Speech API is **not** used (Firefox/Linux defaults to eSpeak, which is robot
 
 To add a **new prompt**: add it to `PROMPT_SLUGS` and to the `PHRASES` array in `scripts/generate-voice.sh`, then run the script (requires `pip install edge-tts`) — it regenerates the slug for every voice profile.
 
-To add a **new voice**: append to `VOICE_PROFILES` in `voiceProfiles.ts` and add a matching `id:edge-voice-name` line to `VOICES` in `generate-voice.sh`, then run the script (optionally pass the new id as an arg to render only that one).
+To add a **new voice**: append to `VOICE_PROFILES` in `voiceProfiles.ts` and add a matching row to `VOICES` in `generate-voice.sh`, then run the script (optionally pass the new id as an arg to render only that one). The script supports two engines:
+
+- `edge` (Microsoft neural via `edge-tts`, free, offline) — row format `id|edge|voice-name|rate|pitch`.
+- `11l` (ElevenLabs, premium quality) — row format `id|11l|voice-id|model-id|stability|similarity_boost`. Requires `ELEVENLABS_API_KEY` env var at generation time only (clips are baked into `public/voice/{id}/`, so the running app never calls the API). Voice IDs come from `elevenlabs.io/app/voice-library` or the `/v1/voices` endpoint.
+
+The same ffmpeg post-processing (silence trim for action clips, bandpass + whispered hiss for counts) runs regardless of engine, so output clips are interchangeable across engines.
 
 The service worker precaches all `*.mp3`, so all voices are available offline after first load.
 

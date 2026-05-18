@@ -21,6 +21,7 @@ import { appendHistory } from "@/lib/storage";
 import { findTechnique, type Technique } from "@/lib/techniques";
 import { getProgramDay, markDayComplete } from "@/lib/program";
 import { track } from "@/lib/analytics";
+import { VOICE_PROFILES } from "@/lib/voiceProfiles";
 
 type Stage =
   | "safety" // safety modal (only if technique has safetyNotes)
@@ -241,6 +242,23 @@ function SessionInner({ technique }: { technique: Technique }) {
 
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-5 pb-6 max-w-md mx-auto">
+      {import.meta.env.DEV && (
+        <div className="fixed top-2 right-2 z-50 flex items-center gap-1.5 bg-slate-900/80 text-slate-200 text-xs rounded-lg px-2 py-1 backdrop-blur">
+          <span className="opacity-60">voice</span>
+          <select
+            value={settings.voiceProfile}
+            onChange={(e) => update({ voiceProfile: e.target.value })}
+            className="bg-transparent outline-none cursor-pointer"
+            aria-label="Debug: switch voice profile"
+          >
+            {VOICE_PROFILES.map((p) => (
+              <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {/* Top bar */}
       <header className="flex items-center justify-between pt-3 pb-2 text-sm">
         <button
