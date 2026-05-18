@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettings } from "@/lib/settings";
@@ -34,40 +34,36 @@ export function Onboarding() {
   const [i, setI] = useState(0);
   const [videoEnded, setVideoEnded] = useState(false);
   const navigate = useNavigate();
-  const { settings, update } = useSettings();
+  const { update } = useSettings();
   const reducedMotion = useReducedMotion();
   const audio = useAudioEngine();
   const audioStarted = useRef(false);
-  const mountedRef = useRef(true);
   const isLast = i === SLIDES.length - 1;
   const hasVideoBg = i === 0;
 
-  useEffect(() => {
-    return () => { mountedRef.current = false; };
-  }, []);
-
-  const startAudio = async () => {
+  // Fire-and-forget audio unlock from the same task as the user gesture.
+  // startMusic() internally respects settings.musicEnabled, so we don't
+  // duplicate that check here. Synchronous so the gesture activation is
+  // still hot when Tone.start() calls AudioContext.resume() under the hood.
+  const startAudio = () => {
     if (audioStarted.current) return;
     audioStarted.current = true;
-    await audio.unlock();
-    if (mountedRef.current && settings.musicEnabled) audio.startMusic();
+    void audio.unlock().then(() => audio.startMusic());
   };
 
   const finish = (skipped: boolean) => {
-    mountedRef.current = false;
     if (audio.isMusicPlaying()) audio.fadeOutMusic(1.5);
     update({ onboarded: true, program: enrollState() });
     track("onboarding_complete", { skipped });
     navigate("/", { replace: true });
   };
 
-  const next = async () => {
-    await startAudio();
+  const next = () => {
+    startAudio();
     isLast ? finish(false) : setI((v) => v + 1);
   };
 
-  const skip = async () => {
-    await startAudio();
+  const skip = () => {
     finish(true);
   };
 
