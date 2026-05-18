@@ -49,6 +49,22 @@ OUT_ROOT="$(dirname "$0")/../public/voice"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+# Lazy-init the ElevenLabs auth headers in a file under $TMP_DIR so the API
+# key never appears in curl's argv (which is world-readable via /proc on
+# Linux). The file inherits $TMP_DIR's 0700 perms; we set 0600 on it as
+# defence-in-depth. Cleared automatically by the EXIT trap.
+ELEVENLABS_HEADER_FILE=""
+prepare_elevenlabs_header() {
+  if [[ -n "$ELEVENLABS_HEADER_FILE" ]]; then return; fi
+  : "${ELEVENLABS_API_KEY:?ELEVENLABS_API_KEY not set — needed for 11l engine voices}"
+  ELEVENLABS_HEADER_FILE="$TMP_DIR/elevenlabs-headers"
+  ( umask 077 && {
+      echo "xi-api-key: $ELEVENLABS_API_KEY"
+      echo "Content-Type: application/json"
+      echo "Accept: audio/mpeg"
+    } > "$ELEVENLABS_HEADER_FILE" )
+}
+
 # slug → phrase. Keep slugs in sync with PROMPT_SLUGS in src/hooks/useSpeech.ts.
 declare -A PHRASES=(
   ["breathe-in"]="Breathe in"
@@ -184,24 +200,24 @@ synthesize() {
       ;;
     11l)
       local voice_id="$1" model="$2" stability="$3" similarity="$4"
-      : "${ELEVENLABS_API_KEY:?ELEVENLABS_API_KEY not set — needed for 11l engine voices}"
-      local body
-      body=$(jq -nc \
+      prepare_elevenlabs_header
+      # Write request body to a temp file so it stays out of curl's argv too
+      # (pairs with the header-file fix for the credential).
+      local body_file="$TMP_DIR/elevenlabs-body.json"
+      jq -nc \
         --arg text "$phrase" --arg model "$model" \
         --argjson stability "$stability" --argjson similarity "$similarity" \
         '{text:$text, model_id:$model,
           voice_settings:{stability:$stability, similarity_boost:$similarity,
-                          style:0.0, use_speaker_boost:true}}')
+                          style:0.0, use_speaker_boost:true}}' > "$body_file"
       # Retry transient 429/5xx with exponential backoff. ElevenLabs returns
       # 429 "system_busy" during traffic spikes; usually clears within seconds.
       local http_code attempt delay
       for attempt in 1 2 3 4; do
         http_code=$(curl -sS -w "%{http_code}" -o "$raw" \
           -X POST "https://api.elevenlabs.io/v1/text-to-speech/${voice_id}?output_format=mp3_44100_128" \
-          -H "xi-api-key: $ELEVENLABS_API_KEY" \
-          -H "Content-Type: application/json" \
-          -H "Accept: audio/mpeg" \
-          --data "$body")
+          -H "@$ELEVENLABS_HEADER_FILE" \
+          --data "@$body_file")
         if [[ "$http_code" == "200" ]]; then break; fi
         if [[ "$http_code" != "429" && "$http_code" != "5"* ]]; then break; fi
         if [[ "$attempt" == "4" ]]; then break; fi
