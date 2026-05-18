@@ -41,6 +41,7 @@ const SLIDES = [
 export function Onboarding() {
   const [i, setI] = useState(0);
   const [videoEnded, setVideoEnded] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const navigate = useNavigate();
   const { settings, update } = useSettings();
   const reducedMotion = useReducedMotion();
@@ -88,19 +89,30 @@ export function Onboarding() {
     navigate("/", { replace: true });
   };
 
+  // First tap anywhere on the page unlocks audio and retries narration —
+  // which is otherwise blocked on slide 0 since there's no prior gesture.
+  const handleFirstTap = () => {
+    if (hasInteracted) return;
+    setHasInteracted(true);
+    startAudio();
+    narrationRef.current?.play().catch(() => { /* ignore */ });
+  };
+
   const next = () => {
     startAudio();
+    setHasInteracted(true);
     isLast ? finish(false) : setI((v) => v + 1);
   };
 
   const skip = () => {
+    setHasInteracted(true);
     finish(true);
   };
 
   return (
     // fixed inset-0 so we own the full viewport — avoids the body's
     // background-attachment:fixed gradient painting over any child layers.
-    <div className="fixed inset-0 flex flex-col">
+    <div className="fixed inset-0 flex flex-col" onClick={handleFirstTap}>
 
       {/* ── Background layers (slide 0 only) ────────────────────────── */}
       {/* Dark base always present so the slide-exit fade lands on dark */}
@@ -185,6 +197,23 @@ export function Onboarding() {
             </motion.div>
           </AnimatePresence>
         </div>
+
+        {/* Tap-to-start hint — appears on slide 0 until first interaction.
+            Slide 0's narration would otherwise be blocked by autoplay policy. */}
+        <AnimatePresence>
+          {hasVideoBg && !hasInteracted && settings.voiceEnabled && (
+            <motion.div
+              key="tap-hint"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.4, delay: 0.6 }}
+              className="text-center text-white/75 text-sm mb-3 pointer-events-none"
+            >
+              Tap anywhere to begin
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex justify-center gap-2 mb-6">
           {SLIDES.map((_, idx) => (
