@@ -46,6 +46,15 @@ VOICES=(
   "christopher|11l|zO2z8i0srbO9r7GT5C4h|eleven_multilingual_v2|0.80|0.85"
 )
 
+# Per-(voice, slug) model overrides for 11l voices. Key is "<profile-id>:<slug>".
+# Reach for this when one specific clip needs a different model than the voice's
+# default — e.g. eleven_v3 handles short single-word utterances ("Hold") better
+# than multilingual_v2 but is less consistent across a full 30-clip set, so we
+# only opt in per-slug.
+declare -A SLUG_MODEL_OVERRIDES=(
+  [priyanka:hold]="eleven_v3"
+)
+
 OUT_ROOT="$(dirname "$0")/../public/voice"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -274,7 +283,17 @@ for entry in "${VOICES[@]}"; do
     raw="$TMP_DIR/$id-$slug-raw.mp3"
     out="$out_dir/$slug.mp3"
 
-    synthesize "$engine" "$raw" "$phrase" "$slug" "${engine_params[@]}"
+    # Per-slug model override for 11l: swap the model field (engine_params[1])
+    # if SLUG_MODEL_OVERRIDES has an entry for this voice+slug.
+    call_params=("${engine_params[@]}")
+    if [[ "$engine" == "11l" ]]; then
+      override="${SLUG_MODEL_OVERRIDES[$id:$slug]:-}"
+      if [[ -n "$override" ]]; then
+        call_params[1]="$override"
+        echo "  (slug override: $slug → $override)"
+      fi
+    fi
+    synthesize "$engine" "$raw" "$phrase" "$slug" "${call_params[@]}"
 
     if [[ "$slug" == count-* ]]; then
       n="${slug#count-}"
