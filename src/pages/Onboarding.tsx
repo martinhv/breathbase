@@ -35,9 +35,9 @@ const SLIDES = [
   },
   {
     icon: "🗓️",
-    title: "A seven-day start",
-    body: "We've laid out a one-week program — a different foundational practice each day. Pick it up on the home screen whenever you're ready.",
-    narration: "seven-day",
+    title: "A five-day start",
+    body: "We've laid out a five-day Foundations program — one practice per day, each with a short lesson. Pick it up on the home screen whenever you're ready.",
+    narration: "five-day",
   },
 ];
 

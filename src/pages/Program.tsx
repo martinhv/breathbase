@@ -21,11 +21,12 @@ function PreEnroll() {
   return (
     <div className="p-5 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
       <div className="text-xs uppercase tracking-widest text-teal-300/80 mb-1">
-        Foundational, in seven days
+        Foundational, in five days
       </div>
       <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-4">
-        A different foundational practice each day. Slow breath, resonance,
-        holds, long exhales, focus. About five minutes a day for a week.
+        One practice per day, each with a brief lesson. Slow breath, resonance,
+        holds, long exhales, and a reset you can use anywhere. About five
+        minutes a day.
       </p>
       <button
         onClick={() => update({ program: enrollState() })}
@@ -114,7 +115,7 @@ function PageHeader() {
       </Link>
       <div>
         <div className="text-xs uppercase tracking-widest text-slate-500">
-          {PROGRAM.emoji} Seven-day program
+          {PROGRAM.emoji} Five-day program
         </div>
         <h1 className="text-2xl font-light">{PROGRAM.name}</h1>
       </div>
@@ -167,11 +168,19 @@ export function Program() {
         )}
       </section>
 
+      {import.meta.env.DEV && (
+        <div className="mb-3 px-3 py-2 rounded-xl bg-amber-400/10 border border-amber-400/30 text-[11px] text-amber-300/90">
+          DEV — all days unlocked for testing
+        </div>
+      )}
+
       <div className="flex flex-col gap-3">
         {PROGRAM.days.map((day) => {
+          const unlocked =
+            isDayUnlocked(programState, day.day) || import.meta.env.DEV;
           const state: DayState = isDayComplete(programState, day.day)
             ? "complete"
-            : isDayUnlocked(programState, day.day)
+            : unlocked
               ? "current"
               : "locked";
           return <DayCard key={day.day} day={day} state={state} />;

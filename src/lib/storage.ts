@@ -63,7 +63,7 @@ export type Settings = {
   reducedMotion: ReducedMotionPref;
   /** Per-technique duration overrides in minutes, keyed by technique id. */
   durationOverrides: Record<string, number>;
-  /** Seven-day guided program state. See lib/program.ts. */
+  /** Five-day Foundations program state. See lib/program.ts. */
   program: ProgramState;
   /** Daily practice reminder — fires while the tab is open at this time. */
   reminderEnabled: boolean;

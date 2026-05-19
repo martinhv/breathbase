@@ -95,6 +95,7 @@ declare -A PHRASES=(
   ["exhale-left"]="Exhale left"
   ["settle"]="Settle"
   ["rest"]="Rest"
+  ["get-ready"]="Take a slow breath. Settle in."
   ["preview"]="Breathe in. Hold. Breathe out."
   # Countdown clips: spoken at reduced volume + bandpass for an airy
   # whisper-ish feel. Need up to 15 to cover 4-7-8's 8s exhale and bellows'

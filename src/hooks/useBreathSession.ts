@@ -389,25 +389,81 @@ export function useBreathSession({
     if (state.status === "idle") firedCompleteRef.current = false;
   }, [state.status]);
 
+  // Latest state mirrored to a ref so the rAF tick can read it without
+  // restarting on every dispatch. The effect below depends only on
+  // `state.status` for the start/stop edges; everything else flows via this ref.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // The rAF loop. Active during 'ready' and 'running' only.
+  //
+  // Hot path optimization: tick is called every animation frame (~60 Hz), but
+  // the only display-observable values change at ≤1 Hz (countdown digits,
+  // total elapsed mm:ss) plus the comparatively rare phase boundary. So we
+  // accumulate delta into `accDt` and dispatch only when:
+  //   - the integer-second display value would change (Math.ceil-aligned), or
+  //   - a phase boundary is about to be (or has been) crossed.
+  // Result: ~1-2 dispatches/second instead of ~60, which roughly eliminates
+  // the per-frame re-render churn that was driving mobile jank ("ruckeln").
+  // Boundary precision is preserved because boundary-crossing forces a dispatch.
   useEffect(() => {
     if (state.status !== "ready" && state.status !== "running") return;
     let raf = 0;
     let last = performance.now();
+    let accDt = 0;
     const tick = (now: number) => {
       const dt = now - last;
       last = now;
-      if (state.status === "ready") {
-        dispatch({ type: "READY_TICK", deltaMs: dt });
-      } else {
-        dispatch({ type: "RUN_TICK", deltaMs: dt });
+      accDt += dt;
+
+      const s = stateRef.current;
+      let shouldDispatch = false;
+
+      if (s.status === "ready") {
+        const oldSec = Math.ceil(s.readyRemainingMs / 1000);
+        const newRemaining = s.readyRemainingMs - accDt;
+        const newSec = Math.ceil(newRemaining / 1000);
+        if (newSec !== oldSec || newRemaining <= 0) shouldDispatch = true;
+      } else if (s.status === "running") {
+        const cur = s.phases[s.phaseIndex];
+        if (cur) {
+          const newPhaseElapsed = s.phaseElapsedMs + accDt;
+          const crossesBoundary = newPhaseElapsed >= cur.durationMs;
+          const oldRemSec = Math.ceil(
+            (cur.durationMs - s.phaseElapsedMs) / 1000,
+          );
+          const newRemSec = Math.ceil(
+            (cur.durationMs - newPhaseElapsed) / 1000,
+          );
+          const oldTotalSec = Math.floor(s.totalElapsedMs / 1000);
+          const newTotalSec = Math.floor((s.totalElapsedMs + accDt) / 1000);
+          if (
+            crossesBoundary ||
+            newRemSec !== oldRemSec ||
+            newTotalSec !== oldTotalSec
+          ) {
+            shouldDispatch = true;
+          }
+        }
+      }
+
+      if (shouldDispatch) {
+        const delta = accDt;
+        accDt = 0;
+        if (s.status === "ready") {
+          dispatch({ type: "READY_TICK", deltaMs: delta });
+        } else {
+          dispatch({ type: "RUN_TICK", deltaMs: delta });
+        }
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-    // We intentionally restart the loop only when status crosses the
-    // running/ready boundary, not on every tick.
+    // Effect restarts only when status crosses the running/ready boundary —
+    // not on every dispatch. The tick body reads fresh state from stateRef.
   }, [state.status]);
 
   // Derived selectors

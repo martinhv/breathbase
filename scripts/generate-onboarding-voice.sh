@@ -10,8 +10,10 @@
 #   - curl + jq + ffmpeg
 #
 # Run from repo root:
-#     ./scripts/generate-onboarding-voice.sh             # default voice (theo)
-#     ./scripts/generate-onboarding-voice.sh theo sarah  # specific voices
+#     ./scripts/generate-onboarding-voice.sh                   # default voice (theo), all slugs
+#     ./scripts/generate-onboarding-voice.sh theo sarah        # specific voices, all slugs
+#     ./scripts/generate-onboarding-voice.sh theo -- five-day  # one voice, one slug (cheap)
+#     ./scripts/generate-onboarding-voice.sh -- five-day       # default voice, one slug
 #
 # Output: public/voice/{voice}/onboarding-{slug}.mp3
 #
@@ -21,8 +23,18 @@
 
 set -euo pipefail
 
-if [[ -f .env.local ]]; then
-  set -a; . ./.env.local; set +a
+# Extract ELEVENLABS_API_KEY from .env.local without sourcing the whole file —
+# Vite-style dotenv allows unquoted values with spaces (e.g. company names in
+# VITE_LEGAL_*), which `sh source` chokes on.
+if [[ -f .env.local && -z "${ELEVENLABS_API_KEY:-}" ]]; then
+  line=$(grep -E '^ELEVENLABS_API_KEY=' .env.local | head -1) || true
+  if [[ -n "$line" ]]; then
+    value=${line#ELEVENLABS_API_KEY=}
+    # Strip optional surrounding single or double quotes.
+    [[ "$value" == \"*\" && "$value" == *\" ]] && value=${value:1:-1}
+    [[ "$value" == \'*\' && "$value" == *\' ]] && value=${value:1:-1}
+    export ELEVENLABS_API_KEY="$value"
+  fi
 fi
 
 : "${ELEVENLABS_API_KEY:?ELEVENLABS_API_KEY not set — needed for ElevenLabs API}"
@@ -37,13 +49,13 @@ declare -A VOICES=(
 )
 
 # Ordered list of slide slugs (bash assoc arrays don't preserve order).
-SLUGS=(welcome help start-small seven-day)
+SLUGS=(welcome help start-small five-day)
 
 declare -A NARRATIONS=(
   [welcome]="Welcome to BreathBase. Breathwork is one of the simplest, most powerful tools we have to influence our nervous system — and modern research is catching up with what practitioners have known for centuries. Let's get you started."
   [help]="BreathBase can help with many things. Calm yourself when stress builds. Settle into sleep when your mind won't quiet down. Sharpen your focus before something that matters. Or wake up your body when you're feeling flat. Each technique targets a specific response in your nervous system."
   [start-small]="Five minutes a day is enough. Consistency matters far more than duration — a short practice every morning will do more than an hour once a week."
-  [seven-day]="We've laid out a one-week program — a different foundational practice each day, building from simple to more advanced. It's there on the home screen whenever you're ready to begin."
+  [five-day]="We've laid out a five-day Foundations program — one practice per day, each with a short lesson up front, building from simple to more advanced. It's there on the home screen whenever you're ready to begin."
 )
 
 TMP_DIR=$(mktemp -d)
@@ -61,11 +73,32 @@ HEADER_FILE="$TMP_DIR/elevenlabs-headers"
 # at the same perceived level as the rest of the in-app voice.
 LOUDNORM='loudnorm=I=-22:LRA=7:TP=-1.5'
 
-if [[ $# -eq 0 ]]; then
-  TARGET_VOICES=(theo)
-else
-  TARGET_VOICES=("$@")
-fi
+# Args: [voice...] [-- slug...]. The `--` separator splits voices from slugs;
+# either side may be empty. Defaults: voices=(theo), slugs=all SLUGS.
+TARGET_VOICES=()
+TARGET_SLUGS=()
+seen_sep=0
+for arg in "$@"; do
+  if [[ "$arg" == "--" ]]; then
+    seen_sep=1
+    continue
+  fi
+  if [[ $seen_sep -eq 0 ]]; then
+    TARGET_VOICES+=("$arg")
+  else
+    TARGET_SLUGS+=("$arg")
+  fi
+done
+[[ ${#TARGET_VOICES[@]} -eq 0 ]] && TARGET_VOICES=(theo)
+[[ ${#TARGET_SLUGS[@]} -eq 0 ]] && TARGET_SLUGS=("${SLUGS[@]}")
+
+for slug in "${TARGET_SLUGS[@]}"; do
+  if [[ -z "${NARRATIONS[$slug]+x}" ]]; then
+    echo "Unknown slug: $slug" >&2
+    echo "Available: ${!NARRATIONS[*]}" >&2
+    exit 1
+  fi
+done
 
 for voice in "${TARGET_VOICES[@]}"; do
   if [[ -z "${VOICES[$voice]+x}" ]]; then
@@ -78,7 +111,7 @@ for voice in "${TARGET_VOICES[@]}"; do
   mkdir -p "$out_dir"
   echo "=== $voice (model=$model_id) ==="
 
-  for slug in "${SLUGS[@]}"; do
+  for slug in "${TARGET_SLUGS[@]}"; do
     text="${NARRATIONS[$slug]}"
     out_file="$out_dir/onboarding-$slug.mp3"
     raw_file="$TMP_DIR/$voice-$slug-raw.mp3"

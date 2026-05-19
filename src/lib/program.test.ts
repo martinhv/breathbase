@@ -48,12 +48,38 @@ describe("PROGRAM (Foundations)", () => {
 describe("getProgramDay", () => {
   it("returns the day for a valid number", () => {
     expect(getProgramDay(1)?.day).toBe(1);
-    expect(getProgramDay(7)?.day).toBe(7);
+    expect(getProgramDay(PROGRAM_LENGTH)?.day).toBe(PROGRAM_LENGTH);
   });
   it("returns undefined for out-of-range numbers", () => {
     expect(getProgramDay(0)).toBeUndefined();
-    expect(getProgramDay(8)).toBeUndefined();
+    expect(getProgramDay(PROGRAM_LENGTH + 1)).toBeUndefined();
     expect(getProgramDay(-1)).toBeUndefined();
+  });
+});
+
+describe("PROGRAM day content", () => {
+  it("every day has an intro with non-empty learn/science/notice", () => {
+    for (const d of PROGRAM.days) {
+      expect(d.intro.learn.length, `day ${d.day} learn`).toBeGreaterThan(0);
+      expect(d.intro.science.length, `day ${d.day} science`).toBeGreaterThan(0);
+      expect(d.intro.notice.length, `day ${d.day} notice`).toBeGreaterThan(0);
+    }
+  });
+  it("day 1 has no callback; days 2+ have a callback", () => {
+    expect(PROGRAM.days[0].intro.callback).toBeUndefined();
+    for (let i = 1; i < PROGRAM.days.length; i++) {
+      expect(
+        PROGRAM.days[i].intro.callback,
+        `day ${i + 1} callback`,
+      ).toBeTruthy();
+    }
+  });
+  it("every day has a takeaway", () => {
+    for (const d of PROGRAM.days) {
+      expect(d.takeaway.useWhen.length, `day ${d.day} useWhen`).toBeGreaterThan(
+        0,
+      );
+    }
   });
 });
 

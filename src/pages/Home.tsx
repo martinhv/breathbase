@@ -40,7 +40,7 @@ function ProgramTile() {
               Start the {PROGRAM.name} program
             </div>
             <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
-              A different foundational practice each day for a week.
+              Five days, one practice each — with a short lesson up front.
             </div>
           </div>
           <div className="text-slate-500 dark:text-slate-400">→</div>
@@ -69,7 +69,7 @@ function ProgramTile() {
           </div>
           <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
             {complete
-              ? "Seven days finished"
+              ? `${PROGRAM_LENGTH} days finished`
               : (day?.headline ?? "Continue program")}
           </div>
         </div>

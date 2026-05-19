@@ -12,6 +12,8 @@ import { BreathingOrb } from "@/components/BreathingOrb";
 import { PhaseIndicator } from "@/components/PhaseIndicator";
 import { NostrilDiagram } from "@/components/NostrilDiagram";
 import { SafetyModal } from "@/components/SafetyModal";
+import { TutorialDisclosure } from "@/components/TutorialDisclosure";
+import { LessonNarrationBar } from "@/components/LessonNarrationBar";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { useBreathSession, type ExpandedPhase } from "@/hooks/useBreathSession";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -22,12 +24,14 @@ import { useAuth } from "@/lib/auth";
 import { useHistory } from "@/lib/history";
 import { appendHistory } from "@/lib/storage";
 import { findTechnique, type Technique } from "@/lib/techniques";
-import { getProgramDay, markDayComplete } from "@/lib/program";
+import { PROGRAM, getProgramDay, markDayComplete } from "@/lib/program";
+import { hasTutorial } from "@/lib/tutorials";
 import { track } from "@/lib/analytics";
 import { VOICE_PROFILES } from "@/lib/voiceProfiles";
 
 type Stage =
   | "safety" // safety modal (only if technique has safetyNotes)
+  | "intro" // pre-session lesson card (only when launched from Foundations program)
   | "active" // ready countdown + session
   | "complete"; // "Session complete" summary
 
@@ -107,7 +111,14 @@ function SessionInner({ technique }: { technique: Technique }) {
     !!technique?.safetyNotes &&
     technique.safetyNotes.length > 0 &&
     !settings.acknowledgedSafety.includes(technique.id);
-  const [stage, setStage] = useState<Stage>(needsSafetyAck ? "safety" : "active");
+  // Program-mode sessions get a brief lesson card before the breath starts.
+  // Standalone sessions skip straight to active.
+  const initialStage: Stage = needsSafetyAck
+    ? "safety"
+    : programDay
+      ? "intro"
+      : "active";
+  const [stage, setStage] = useState<Stage>(initialStage);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   const onPhaseEnter = useCallback(
@@ -168,6 +179,19 @@ function SessionInner({ technique }: { technique: Technique }) {
       void beginSession();
     }
   }, [stage, session.status, beginSession]);
+
+  // Play the "Get ready" narration once when the ready countdown starts.
+  // Fired here (not via onPhaseEnter) because ready isn't a breath phase.
+  const readyNarratedRef = useRef(false);
+  useEffect(() => {
+    if (session.status === "ready" && !readyNarratedRef.current) {
+      readyNarratedRef.current = true;
+      speak("Get ready");
+    }
+    if (session.status === "idle") {
+      readyNarratedRef.current = false;
+    }
+  }, [session.status, speak]);
 
   // When the user enters complete stage, write a history entry.
   const historyWritten = useRef(false);
@@ -234,18 +258,99 @@ function SessionInner({ technique }: { technique: Technique }) {
               ],
             });
           }
-          setStage("active");
+          setStage(programDay ? "intro" : "active");
         }}
         onCancel={() => navigate(-1)}
       />
     );
   }
 
+  // ── INTRO (program mode only) ───────────────────────────────────────────
+  if (stage === "intro" && programDay) {
+    return (
+      <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
+        <header className="flex items-center justify-between pt-3 pb-2 text-sm">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+            className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-700 dark:text-slate-300"
+          >
+            ←
+          </button>
+          <div className="text-[10px] uppercase tracking-widest text-teal-300/80">
+            Day {programDay.day} of {PROGRAM.days.length}
+          </div>
+          <div className="w-7" />
+        </header>
+
+        <main className="flex-1 flex flex-col justify-center gap-5">
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              {programDay.durationMin} min · {technique.name}
+            </div>
+            <h1 className="mt-1 text-3xl font-light text-slate-900 dark:text-slate-100">
+              {programDay.headline}
+            </h1>
+          </div>
+
+          {programDay.intro.callback && (
+            <p className="text-sm italic text-slate-600 dark:text-slate-400 leading-relaxed border-l-2 border-teal-400/40 pl-3">
+              {programDay.intro.callback}
+            </p>
+          )}
+
+          <section className="flex flex-col gap-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
+                Today
+              </div>
+              <p className="text-base text-slate-800 dark:text-slate-200 leading-relaxed">
+                {programDay.intro.learn}
+              </p>
+            </div>
+
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
+                Why it works
+              </div>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                {programDay.intro.science}
+              </p>
+            </div>
+
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
+                What to notice
+              </div>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                {programDay.intro.notice}
+              </p>
+            </div>
+          </section>
+        </main>
+
+        <div className="mt-6">
+          <LessonNarrationBar
+            day={programDay.day}
+            enabled={settings.voiceEnabled}
+          />
+        </div>
+
+        <button
+          onClick={() => setStage("active")}
+          className="mt-3 w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
+        >
+          Begin · {programDay.durationMin}m
+        </button>
+      </div>
+    );
+  }
+
   // ── COMPLETE ────────────────────────────────────────────────────────────
   if (stage === "complete") {
     return (
-      <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto text-center">
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
+        <div className="flex-1 flex flex-col items-center text-center pt-8 gap-4">
           <div className="text-5xl">✨</div>
           <h1 className="text-3xl font-light">Session complete</h1>
           <div className="text-sm text-slate-600 dark:text-slate-400">
@@ -256,12 +361,27 @@ function SessionInner({ technique }: { technique: Technique }) {
               {session.cyclesCompleted === 1 ? "" : "s"}
             </p>
           </div>
+          {programDay && (
+            <div className="mt-2 w-full max-w-xs text-left rounded-2xl bg-teal-400/10 border border-teal-400/30 px-4 py-3">
+              <div className="text-[10px] uppercase tracking-widest text-teal-300/90 mb-1">
+                Use this when
+              </div>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                {programDay.takeaway.useWhen}
+              </p>
+            </div>
+          )}
+          {programDay && hasTutorial(technique.id) && (
+            <div className="w-full max-w-md">
+              <TutorialDisclosure techniqueId={technique.id} />
+            </div>
+          )}
         </div>
         <button
           onClick={() =>
             navigate(programDay ? "/program" : "/", { replace: true })
           }
-          className="px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
+          className="mt-6 px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
           Done
         </button>
@@ -325,7 +445,7 @@ function SessionInner({ technique }: { technique: Technique }) {
               {Math.max(1, Math.ceil(session.readyRemainingMs / 1000))}
             </div>
             <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm max-w-xs mx-auto">
-              Take a slow, deep breath. Settle in.
+              Take a slow breath. Settle in.
             </p>
             {recommendFoundation && (
               <div className="mt-4 max-w-xs mx-auto text-left rounded-2xl bg-teal-400/10 border border-teal-400/30 px-4 py-3">

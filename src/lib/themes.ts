@@ -3,7 +3,7 @@
 
 // Themes — goal-driven groupings of techniques. Distinct from categories
 // (which group by physiology: down/upregulate/balance/focus) and from the
-// 7-day Foundations program (a curated sequential curriculum).
+// 5-day Foundations program (a curated sequential curriculum).
 //
 // Themes are top-level entries on Home: a user who "wants help sleeping" can
 // tap Sleep and see the relevant techniques without first having to map

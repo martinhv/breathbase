@@ -33,6 +33,9 @@ const PROMPT_SLUGS: Record<string, string> = {
   "Exhale left": "exhale-left",
   Settle: "settle",
   Rest: "rest",
+  // Played once when the ready countdown starts, to set the tone of the
+  // session. Not a breath phase prompt — fired from Session.tsx.
+  "Get ready": "get-ready",
 };
 
 const PREVIEW_SLUG = "preview";

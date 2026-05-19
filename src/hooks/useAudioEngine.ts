@@ -93,6 +93,15 @@ const linearToDb = (x: number): number => {
  *  Long enough to feel like a fade-in rather than a level change. */
 const MUSIC_FADE_IN_S = 3.0;
 
+/** Minimum seconds between sustained-voice chord changes (cello / pad /
+ *  strings). On fast techniques (bellows: 4 s/cycle, energizing: 3 s/cycle)
+ *  a per-cycle chord change rotates voices faster than the ~5 s release
+ *  envelopes can decay, stacking voices until PolySynth's polyphony cap is
+ *  exceeded and notes are dropped. 8 s keeps slow techniques (coherent,
+ *  box, 4-7-8) on their natural per-cycle cadence while consolidating
+ *  fast-technique changes to every-2-or-3-cycles. */
+const MIN_CHORD_INTERVAL_S = 8;
+
 /** Shift a pitch string up by N octaves. Returns input if unparseable. */
 function shiftOctave(note: string, by: number): string {
   const m = note.match(/^([A-G]#?b?)(-?\d+)$/);
@@ -160,6 +169,9 @@ class AudioEngineImpl {
    * Phrase shapes use `passIndex % 2` to re-voice on alternate loops. */
   private passIndex = 0;
   private lastCycleNumber = 0;
+  /** Tone.now() of the most recent triggerHarmony(). Used to throttle
+   *  chord rotation to MIN_CHORD_INTERVAL_S — see playPhrase(). */
+  private lastHarmonyAt = 0;
   /** The lite-mode flag captured at the last buildGraph(). When the resolved
    * preference changes (e.g. user flips the setting), unlock() disposes the
    * graph so buildGraph() can re-run with the new layer set. */
@@ -206,6 +218,8 @@ class AudioEngineImpl {
     const s = this.settings;
     const lite = this.resolveLite();
     this.currentLiteMode = lite;
+    // eslint-disable-next-line no-console
+    console.info("[audio] buildGraph lite=%s", lite);
     this.master = new Tone.Volume(linearToDb(s.masterVolume)).toDestination();
     // Lite mode: shorter reverb tail (less convolution work per render quantum).
     this.reverb = new Tone.Reverb({
@@ -256,11 +270,19 @@ class AudioEngineImpl {
       oscillator: lite
         ? { type: "sawtooth" }
         : { type: "fatsawtooth", count: 2, spread: 12 },
-      envelope: { attack: 3, decay: 1.2, sustain: 0.75, release: 6 },
+      // Shorter release in lite so the held voice frees up before the next
+      // chord change, preventing release-tail stacking on fast techniques.
+      envelope: {
+        attack: lite ? 1.5 : 3,
+        decay: 1.2,
+        sustain: 0.75,
+        release: lite ? 2.5 : 6,
+      },
     }).connect(this.celloFilter);
-    // Cap voice allocation tight — cello only ever holds a single note at a
-    // time, so the default 32-voice ceiling is wasted on mobile.
-    this.cello.maxPolyphony = lite ? 1 : 4;
+    // Cap voice allocation tight, but leave headroom for the previous voice
+    // to finish its release envelope while the new one attacks. With cap=1
+    // the prior voice can't free up in time on bellows-rate chord changes.
+    this.cello.maxPolyphony = lite ? 2 : 4;
     this.cello.volume.value = -4;
 
     // ── Pad layer (choir-like, mid register) ───────────────────────────
@@ -287,11 +309,21 @@ class AudioEngineImpl {
       oscillator: lite
         ? { type: "triangle" }
         : { type: "fattriangle", count: 3, spread: 18 },
-      envelope: { attack: 3, decay: 1.5, sustain: 0.8, release: 5 },
+      // Shorter release in lite so the prior 2 voices can decay before the
+      // next chord arrives — pad with cap=2 + a 5 s tail would stack notes
+      // on bellows-rate chord rotation. The 8 s chord throttle (see
+      // playPhrase) is the primary defence; this is belt-and-braces.
+      envelope: {
+        attack: lite ? 2 : 3,
+        decay: 1.5,
+        sustain: 0.8,
+        release: lite ? 2.5 : 5,
+      },
     }).connect(this.padFilter);
-    // Pad holds at most 2 chord tones — cap polyphony tight to avoid the
-    // default 32-voice ceiling allocating idle voices.
-    this.pad.maxPolyphony = lite ? 2 : 4;
+    // Pad holds 2 chord tones; cap=4 gives one chord's worth of headroom for
+    // the prior voices to finish their release envelope. In lite mode the
+    // envelope is short enough that cap=2 wasn't quite tight — bump to 3.
+    this.pad.maxPolyphony = lite ? 3 : 4;
     // PolySynth's per-voice volume is a touch hot at default; tame it here.
     this.pad.volume.value = -6;
 
@@ -658,6 +690,10 @@ class AudioEngineImpl {
     this.passIndex = 0;
     this.lastCycleNumber = 0;
     this.lastWasCycle = null;
+    // Stamp the throttle clock at session start; the opening triggerHarmony
+    // below counts as the first chord change, so any per-cycle advance from
+    // playPhrase will be gated by MIN_CHORD_INTERVAL_S from this moment.
+    this.lastHarmonyAt = Tone.now();
 
     // Fade the music bus up from silence so the opening doesn't slam on.
     // The bus level itself is the user's `musicVolume`; per-source attacks
@@ -773,11 +809,21 @@ class AudioEngineImpl {
     }
     this.lastWasCycle = isCycle;
 
-    // Advance the chord when we cross a cycle boundary. cycleNumber 0 means
-    // a non-cycle phase (rest, roundEnd) — those keep the current chord.
+    // Advance the chord when we cross a cycle boundary, but at most once per
+    // MIN_CHORD_INTERVAL_S seconds. On slow techniques (coherent ~11 s/cycle,
+    // box ~16 s, 4-7-8 ~19 s) every cycle still advances. On fast techniques
+    // (bellows 4 s, energizing 3 s) we coalesce 2-3 cycles per chord, which
+    // keeps the sustained voices from rotating faster than their release
+    // envelopes can decay — the source of the "Max polyphony exceeded" warnings.
+    // cycleNumber 0 means a non-cycle phase (rest, roundEnd) — those keep
+    // the current chord regardless.
     if (cycleNumber > 0 && cycleNumber !== this.lastCycleNumber) {
       let chordChanged = false;
-      if (this.lastCycleNumber > 0) {
+      const nowSec = Tone.now();
+      if (
+        this.lastCycleNumber > 0 &&
+        nowSec - this.lastHarmonyAt >= MIN_CHORD_INTERVAL_S
+      ) {
         this.chordIdx = (this.chordIdx + 1) % PROGRESSION.length;
         chordChanged = true;
         if (this.chordIdx === 0) {
@@ -787,7 +833,10 @@ class AudioEngineImpl {
         }
       }
       this.lastCycleNumber = cycleNumber;
-      if (chordChanged) this.triggerHarmony(PROGRESSION[this.chordIdx]);
+      if (chordChanged) {
+        this.triggerHarmony(PROGRESSION[this.chordIdx]);
+        this.lastHarmonyAt = nowSec;
+      }
     }
 
     const chord = PROGRESSION[this.chordIdx];
