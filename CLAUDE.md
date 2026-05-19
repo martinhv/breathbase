@@ -21,7 +21,9 @@ There are no automated tests. Type-checking (`npm run lint`) is the primary corr
 
 **Local env:** for production-like running, copy `.env.example` → `.env.local` and fill in the six `VITE_FIREBASE_*` values from your Firebase web-app config. README has the full Firebase setup walkthrough (enable Google provider, Firestore rules).
 
-**Local mode:** if `VITE_LOCAL_MODE=true` is set, **or** the `VITE_FIREBASE_*` env vars are all empty, the app skips Firebase entirely. A synthetic "local user" is signed in automatically (no Login screen) and settings/sessions persist to `window.localStorage` under `breathbase:local-user:*` keys. Useful for `npm run dev` on a fresh clone with zero setup, or offline-only testing. See `src/lib/firebase.ts` for the `localMode` flag — `storage.ts` and `auth.tsx` branch on it. Settings UI hides the sign-out button and relabels "Delete account" to "Clear local data".
+**Local mode (build-time):** if `VITE_LOCAL_MODE=true` is set, **or** the `VITE_FIREBASE_*` env vars are all empty, the app skips Firebase entirely. A synthetic "local user" is signed in automatically (no Login screen) and settings/sessions persist to `window.localStorage` under `breathbase:local-user:*` keys. Useful for `npm run dev` on a fresh clone with zero setup, or offline-only testing. See `src/lib/firebase.ts` for the `localMode` flag.
+
+**Guest mode (runtime):** when Firebase IS configured, the Login screen leads with a "Start without an account" CTA. Clicking it sets `localStorage["breathbase:guestMode"] = "true"` and signs the same synthetic `local-user` in for this device. Storage routing is by **uid** (`isLocalUid(uid)` in `firebase.ts`), so guests and build-time-local users share the same localStorage paths. When a guest later signs in to Firebase, `migrateGuestData(toUid)` in `storage.ts` copies their local settings (only if the target account is brand-new) and all sessions (always additive) into Firestore, then clears the local copy. `useAuth()` exposes `isGuest` and `canRegister` so the UI can offer the upgrade CTA only when there's actually a Firebase backend to upgrade *to*.
 
 **Push reminders (optional):** if `VITE_FIREBASE_VAPID_KEY` is set, daily reminders are delivered via Firebase Cloud Messaging (background-capable) instead of the client-side `setTimeout`. Client wiring in `src/lib/push.ts`, scheduled Cloud Function in `functions/src/index.ts`, FCM service worker in `public/firebase-messaging-sw.js` (rewritten at build time by `scripts/build-fcm-sw.mjs` to inline Firebase config). See README "Push reminders" for the deploy steps.
 
@@ -33,7 +35,9 @@ BreathBase is a mobile-first PWA (React 18 + TypeScript + Vite). Auth required (
 
 ### Auth + data model
 
-`AuthProvider` (`lib/auth.tsx`) wraps the tree at the root and exposes `{ user, status, signInWithGoogle, signOut }` via `useAuth()`. `App.tsx`'s `AuthGate` renders `<Login>` when `status === "signedOut"` and the real app (under `SettingsProvider`) when signed in. **`SettingsProvider` mounts only when a user is present** — so anything under it can rely on `user` being non-null inside effects (the providers above will have unmounted the subtree on sign-out).
+`AuthProvider` (`lib/auth.tsx`) wraps the tree at the root and exposes `{ user, status, isGuest, canRegister, signInWithGoogle, continueAsGuest, signOut, … }` via `useAuth()`. `App.tsx`'s `AuthGate` renders `<Login>` when `status === "signedOut"` and the real app (under `SettingsProvider`) when signed in. **`SettingsProvider` mounts only when a user is present** — so anything under it can rely on `user` being non-null inside effects (the providers above will have unmounted the subtree on sign-out).
+
+There are two `AuthContext` implementations behind a single provider: `FirebaseAuthProvider` (Firebase configured) and `LocalAuthProvider` (build-time local mode — always-on synthetic user, no register path). The Firebase one supports a runtime guest sub-state: no Firebase user + `guestMode` flag in localStorage ⇒ signed in as synthetic LOCAL_USER. Promoting a guest to a real account migrates their local data in the `onAuthStateChanged` effect.
 
 Firestore layout (rules in README restrict each user to their own subtree):
 

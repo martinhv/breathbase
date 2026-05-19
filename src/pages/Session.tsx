@@ -52,16 +52,30 @@ export function Session() {
     );
   }
   // SessionInner is mounted only once we know the technique exists, so the
-  // hooks inside it never have to deal with an undefined value.
-  return <SessionInner technique={technique} />;
+  // hooks inside it never have to deal with an undefined value. `key` forces
+  // a fresh mount whenever the technique changes — without this, navigating
+  // between sessions (e.g. via the "Try Box Breathing first" recommendation)
+  // would re-use the previous instance's stage/state.
+  return <SessionInner key={technique.id} technique={technique} />;
 }
 
 function SessionInner({ technique }: { technique: Technique }) {
   const navigate = useNavigate();
   const { settings, update } = useSettings();
   const { user } = useAuth();
-  const { reload: reloadHistory } = useHistory();
+  const { history, reload: reloadHistory } = useHistory();
   const [searchParams] = useSearchParams();
+
+  // First-timer guard for upregulate techniques: if the user has never
+  // completed a non-upregulate session, recommend starting with a calmer
+  // practice. Shown in the safety modal AND inline in Get Ready (until
+  // they've actually done one).
+  const hasFoundationExperience = useMemo(
+    () => history.some((e) => e.category !== "upregulate"),
+    [history],
+  );
+  const recommendFoundation =
+    technique.category === "upregulate" && !hasFoundationExperience;
 
   // If we're launched from the Foundations program (e.g. `?program=3`), and
   // that day's prescribed technique matches the one we're running, use the
@@ -86,10 +100,14 @@ function SessionInner({ technique }: { technique: Technique }) {
   const { speak, cancel: cancelSpeech } = useSpeech();
   const vibrate = useHaptics();
 
-  // Stage progression. SafetyModal first if applicable.
-  const [stage, setStage] = useState<Stage>(
-    technique?.safetyNotes && technique.safetyNotes.length > 0 ? "safety" : "active",
-  );
+  // Stage progression. The safety modal is one-time per technique — once
+  // acknowledged it's replaced by the inline notes shown in the Get Ready
+  // phase below.
+  const needsSafetyAck =
+    !!technique?.safetyNotes &&
+    technique.safetyNotes.length > 0 &&
+    !settings.acknowledgedSafety.includes(technique.id);
+  const [stage, setStage] = useState<Stage>(needsSafetyAck ? "safety" : "active");
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   const onPhaseEnter = useCallback(
@@ -111,11 +129,18 @@ function SessionInner({ technique }: { technique: Technique }) {
     /* no-op: music already started in beginSession */
   }, []);
 
+  // When the technique has safety notes, the Get Ready prelude doubles as
+  // a reading window — extend it so users have time to skim the bullets.
+  const readyMs = technique.safetyNotes && technique.safetyNotes.length > 0
+    ? 10_000
+    : undefined;
+
   // We need a ref to the session handle so we can record history on complete
   // without a stale closure.
   const session = useBreathSession({
     technique,
     durationMin: duration,
+    readyMs,
     onPhaseEnter,
     onStartRunning,
     onComplete: () => {
@@ -193,10 +218,22 @@ function SessionInner({ technique }: { technique: Technique }) {
         open
         techniqueName={technique.name}
         notes={technique.safetyNotes ?? []}
+        recommendFoundation={recommendFoundation}
         onAcknowledge={async () => {
           // Unlock audio within this gesture (in case the Category click's
           // unlock happened in a different tab / didn't take).
           await audio.unlock();
+          // Persist the acknowledgement so the modal is one-time per
+          // technique; the notes remain visible inline in the Get Ready
+          // phase as an ongoing reminder.
+          if (!settings.acknowledgedSafety.includes(technique.id)) {
+            update({
+              acknowledgedSafety: [
+                ...settings.acknowledgedSafety,
+                technique.id,
+              ],
+            });
+          }
           setStage("active");
         }}
         onCancel={() => navigate(-1)}
@@ -290,6 +327,34 @@ function SessionInner({ technique }: { technique: Technique }) {
             <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm max-w-xs mx-auto">
               Take a slow, deep breath. Settle in.
             </p>
+            {recommendFoundation && (
+              <div className="mt-4 max-w-xs mx-auto text-left rounded-2xl bg-teal-400/10 border border-teal-400/30 px-4 py-3">
+                <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug">
+                  <strong className="text-slate-900 dark:text-slate-100">New here?</strong>{" "}
+                  Activating techniques can be intense. Try a calmer
+                  practice first.
+                </p>
+                <Link
+                  to="/session/box-breathing"
+                  replace
+                  className="mt-1.5 inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 underline-offset-2 hover:underline"
+                >
+                  Try Box Breathing first →
+                </Link>
+              </div>
+            )}
+            {technique.safetyNotes && technique.safetyNotes.length > 0 && (
+              <div className="mt-4 max-w-xs mx-auto text-left rounded-2xl bg-amber-400/10 border border-amber-400/30 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-widest text-amber-300/90 mb-2">
+                  Safety reminder
+                </div>
+                <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 list-disc pl-4">
+                  {technique.safetyNotes.map((n, i) => (
+                    <li key={i}>{n}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ) : phase ? (
           <>

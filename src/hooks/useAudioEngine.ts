@@ -89,6 +89,10 @@ const linearToDb = (x: number): number => {
   return Math.max(-60, 20 * Math.log10(x));
 };
 
+/** Seconds to ramp the music bus from silence to settings level on startMusic.
+ *  Long enough to feel like a fade-in rather than a level change. */
+const MUSIC_FADE_IN_S = 3.0;
+
 /** Shift a pitch string up by N octaves. Returns input if unparseable. */
 function shiftOctave(note: string, by: number): string {
   const m = note.match(/^([A-G]#?b?)(-?\d+)$/);
@@ -164,15 +168,22 @@ class AudioEngineImpl {
   private settings: Settings = DEFAULT_SETTINGS;
 
   /** Resolve the user's liteMusicMode preference into an effective boolean.
-   * "auto" treats coarse-pointer devices (phones, most tablets) as lite —
-   * those are where the full ensemble produces audible underruns. */
+   * "auto" enables lite mode on devices that are likely to underrun the full
+   * ensemble: phones/tablets (coarse pointer), low-core machines, or devices
+   * reporting modest RAM. Each signal alone is noisy, so any one positive
+   * trips the heuristic — better to ship lite by default than to glitch. */
   private resolveLite(): boolean {
     const pref = this.settings.liteMusicMode ?? "auto";
     if (pref === "on") return true;
     if (pref === "off") return false;
     if (typeof window === "undefined") return false;
     try {
-      return window.matchMedia("(pointer: coarse)").matches;
+      if (window.matchMedia("(pointer: coarse)").matches) return true;
+      const cores = navigator.hardwareConcurrency;
+      if (typeof cores === "number" && cores > 0 && cores < 4) return true;
+      const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory;
+      if (typeof mem === "number" && mem > 0 && mem < 4) return true;
+      return false;
     } catch {
       return false;
     }
@@ -201,9 +212,10 @@ class AudioEngineImpl {
       decay: lite ? 2.5 : 6,
       wet: lite ? 0.2 : 0.35,
     }).connect(this.master);
-    this.pianoVolume = new Tone.Volume(
-      s.musicEnabled ? linearToDb(s.musicVolume) : -Infinity,
-    ).connect(this.reverb);
+    // Start the music bus silent — startMusic() will ramp it up so the
+    // ensemble fades in instead of slamming on at full volume. (When music
+    // is disabled in settings we just leave the bus at -Infinity.)
+    this.pianoVolume = new Tone.Volume(-Infinity).connect(this.reverb);
 
     // Salamander Grand Piano samples are hosted by the Tone.js project as
     // unbundled mp3s. We list a handful of anchor notes and let the Sampler
@@ -605,7 +617,11 @@ class AudioEngineImpl {
     this.settings = next;
     if (this.master)
       this.master.volume.rampTo(linearToDb(next.masterVolume), 0.1);
-    if (this.pianoVolume)
+    // Only re-target the music bus when music is actively playing — when idle
+    // the bus is held at -Infinity so the next session can fade in. Otherwise
+    // a volume-slider tweak between sessions would expose the bus and break
+    // the fade-in on the next startMusic().
+    if (this.pianoVolume && this.musicPlaying)
       this.pianoVolume.volume.rampTo(
         next.musicEnabled ? linearToDb(next.musicVolume) : -Infinity,
         0.2,
@@ -642,6 +658,17 @@ class AudioEngineImpl {
     this.passIndex = 0;
     this.lastCycleNumber = 0;
     this.lastWasCycle = null;
+
+    // Fade the music bus up from silence so the opening doesn't slam on.
+    // The bus level itself is the user's `musicVolume`; per-source attacks
+    // happen on top of that, so they all rise together over the fade window.
+    if (this.pianoVolume) {
+      this.pianoVolume.volume.cancelScheduledValues(Tone.now());
+      this.pianoVolume.volume.rampTo(
+        this.settings.musicEnabled ? linearToDb(this.settings.musicVolume) : -Infinity,
+        MUSIC_FADE_IN_S,
+      );
+    }
 
     const scape = this.currentSoundscape();
     if (scape === "piano") {
@@ -696,13 +723,11 @@ class AudioEngineImpl {
       return;
     }
     this.musicPlaying = false;
-    // Ramp piano channel to silence, then release any voices and restore the
-    // settings-driven volume so the next session starts at the right level.
+    // Ramp the music bus to silence, then release voices. The bus stays at
+    // -Infinity afterwards so the next startMusic() can fade in from silence
+    // again rather than slamming on at the user's chosen level.
     v.volume.cancelScheduledValues(Tone.now());
     v.volume.rampTo(-Infinity, seconds);
-    const restoreDb = this.settings.musicEnabled
-      ? linearToDb(this.settings.musicVolume)
-      : -Infinity;
     window.setTimeout(
       () => {
         this.piano?.releaseAll();
@@ -711,7 +736,6 @@ class AudioEngineImpl {
         if (this.oceanVolume) this.oceanVolume.volume.value = -Infinity;
         if (this.rainVolume) this.rainVolume.volume.value = -Infinity;
         if (this.brownVolume) this.brownVolume.volume.value = -Infinity;
-        if (this.pianoVolume) this.pianoVolume.volume.value = restoreDb;
       },
       Math.ceil(seconds * 1000) + 50,
     );

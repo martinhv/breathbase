@@ -12,7 +12,7 @@
 
 import { getMessaging, getToken, deleteToken } from "firebase/messaging";
 import { doc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { db, firebaseApp, localMode } from "./firebase";
+import { db, firebaseApp, isLocalUid, localMode } from "./firebase";
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as
   | string
@@ -90,7 +90,7 @@ export async function registerDevice(
   uid: string,
   data: DeviceDoc,
 ): Promise<void> {
-  if (localMode) return;
+  if (localMode || isLocalUid(uid)) return;
   await setDoc(
     doc(db, "users", uid, "devices", data.fcmToken),
     {
@@ -107,7 +107,7 @@ export async function unregisterDevice(
   uid: string,
   token: string,
 ): Promise<void> {
-  if (localMode) return;
+  if (localMode || isLocalUid(uid)) return;
   try {
     await deleteDoc(doc(db, "users", uid, "devices", token));
   } catch (e) {

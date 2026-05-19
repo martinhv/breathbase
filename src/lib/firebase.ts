@@ -52,6 +52,12 @@ const explicitlyLocal = import.meta.env.VITE_LOCAL_MODE === "true";
 const hasAnyFirebaseConfig = Object.values(config).some((v) => !!v);
 export const localMode = explicitlyLocal || !hasAnyFirebaseConfig;
 
+/** UID used for any user whose data lives in localStorage rather than
+ *  Firestore — i.e. build-time local mode OR a runtime guest who chose
+ *  "continue without an account". Storage routing keys off this UID. */
+export const LOCAL_UID = "local-user";
+export const isLocalUid = (uid: string): boolean => uid === LOCAL_UID;
+
 let _app: FirebaseApp | undefined;
 let _auth: Auth | undefined;
 let _db: Firestore | undefined;

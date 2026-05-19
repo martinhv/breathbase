@@ -70,7 +70,7 @@ type State = {
 
 type Action =
   | { type: "LOAD"; phases: ExpandedPhase[]; totalDurationMs: number; totalCycles: number }
-  | { type: "START" }
+  | { type: "START"; readyMs: number }
   | { type: "READY_TICK"; deltaMs: number }
   | { type: "RUN_TICK"; deltaMs: number }
   | { type: "PAUSE" }
@@ -103,7 +103,7 @@ function reducer(state: State, action: Action): State {
       };
     case "START":
       if (state.phases.length === 0) return state;
-      return { ...state, status: "ready", readyRemainingMs: READY_DURATION_MS };
+      return { ...state, status: "ready", readyRemainingMs: action.readyMs };
     case "READY_TICK": {
       if (state.status !== "ready") return state;
       const remaining = state.readyRemainingMs - action.deltaMs;
@@ -263,6 +263,10 @@ function expandWithMeta(t: Technique, durationMin: number): ExpandedPhase[] {
 export type UseBreathSessionConfig = {
   technique: Technique;
   durationMin: number;
+  /** Override for the "Get Ready" prelude. Defaults to 3s; sessions that
+   *  surface safety notes during the prelude pass a longer value so the
+   *  user has time to read. */
+  readyMs?: number;
   /** Fired when the active phase changes during `running`. */
   onPhaseEnter?: (phase: ExpandedPhase, index: number) => void;
   /** Fired once when entering the `running` state (after `ready`). */
@@ -297,6 +301,7 @@ export type BreathSession = {
 export function useBreathSession({
   technique,
   durationMin,
+  readyMs = READY_DURATION_MS,
   onPhaseEnter,
   onStartRunning,
   onComplete,
@@ -423,7 +428,10 @@ export function useBreathSession({
     : 0;
   const currentRound = currentPhase?.roundNumber ?? 0;
 
-  const start = useCallback(() => dispatch({ type: "START" }), []);
+  const start = useCallback(
+    () => dispatch({ type: "START", readyMs }),
+    [readyMs],
+  );
   const pause = useCallback(() => dispatch({ type: "PAUSE" }), []);
   const resume = useCallback(() => dispatch({ type: "RESUME" }), []);
   const skipPhase = useCallback(() => dispatch({ type: "SKIP_PHASE" }), []);

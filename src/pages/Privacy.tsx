@@ -56,6 +56,16 @@ export function Privacy() {
             personalised, multi-device experience.
           </p>
 
+          <div className="mb-3 rounded-xl bg-teal-400/10 border border-teal-400/30 px-3 py-2 text-xs text-slate-700 dark:text-slate-300">
+            <strong className="text-slate-900 dark:text-slate-100">
+              Guest mode:
+            </strong>{" "}
+            if you chose "Start without an account", your settings and session
+            history are stored only in this browser's local storage. None of
+            the data described in this section leaves your device until you
+            create an account.
+          </div>
+
           <div className="space-y-3">
             <div>
               <h3 className="text-sm text-slate-900 dark:text-slate-100 font-medium">

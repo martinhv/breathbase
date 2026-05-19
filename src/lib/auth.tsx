@@ -5,9 +5,17 @@
 // rest of the app reads via `useAuth()`. The router uses `status` to decide
 // what to render (loading shell / login screen / actual app).
 //
-// In local mode (see firebase.ts) the FirebaseAuthProvider is swapped for a
-// LocalAuthProvider that synthesizes a signed-in "local user" so there's no
-// login flow and all per-user data is namespaced under that synthetic uid.
+// Three modes coexist behind the same context:
+//   1. Build-time local mode (no Firebase config): always-signed-in synthetic
+//      LOCAL_USER, no choice to register. `canRegister` is false.
+//   2. Firebase-configured + signed in: real Firebase User, isGuest=false.
+//   3. Firebase-configured + runtime guest: user picked "continue without an
+//      account" on the Login screen. Same synthetic LOCAL_USER, isGuest=true,
+//      `canRegister` is true so the UI can offer a sign-up upgrade.
+//
+// When a guest signs into Firebase, `migrateGuestData()` copies their local
+// settings + sessions into the new Firestore account before status flips to
+// the signed-in Firebase user.
 
 import {
   createContext,
@@ -15,6 +23,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -31,14 +40,20 @@ import {
   signOut as fbSignOut,
   type User,
 } from "firebase/auth";
-import { auth, googleProvider, localMode } from "./firebase";
-import { deleteAllUserData } from "./storage";
+import { auth, googleProvider, localMode, LOCAL_UID } from "./firebase";
+import { deleteAllUserData, migrateGuestData } from "./storage";
 
 export type AuthStatus = "loading" | "signedOut" | "signedIn";
 
 type AuthContextValue = {
   user: User | null;
   status: AuthStatus;
+  /** True when the active user is the synthetic LOCAL_USER (build-time local
+   *  mode OR runtime guest who picked "continue without an account"). */
+  isGuest: boolean;
+  /** True when Firebase is configured at build time, so the app can offer
+   *  registration as an upgrade path. False in build-time local mode. */
+  canRegister: boolean;
   signInWithGoogle: () => Promise<void>;
   /** Email/password sign-in. Throws the original Firebase error so the caller
    *  can map the error code to a friendly message. */
@@ -48,13 +63,15 @@ type AuthContextValue = {
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   /** Trigger a password-reset email. Throws on failure. */
   sendPasswordReset: (email: string) => Promise<void>;
+  /** Skip account creation — flip into guest mode using localStorage. */
+  continueAsGuest: () => void;
   signOut: () => Promise<void>;
   /**
    * Wipe all of the current user's Firestore data and delete their Firebase
    * Auth account. If Firebase requires a recent login, this transparently
    * re-auths against the provider the user signed in with (Google popup or
-   * an email/password prompt) and retries. In local mode this clears the
-   * locally-stored data — there's no auth account to delete.
+   * an email/password prompt) and retries. In local/guest mode this clears
+   * the locally-stored data — there's no auth account to delete.
    */
   deleteAccount: () => Promise<void>;
   error: string | null;
@@ -62,10 +79,9 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** Synthetic user for local mode. Only the fields the app actually reads
- *  (uid, displayName, email, photoURL) are populated; the rest of the
- *  Firebase User shape is unused and cast away. */
-export const LOCAL_UID = "local-user";
+/** Synthetic user for local mode + runtime guest. Only the fields the app
+ *  actually reads (uid, displayName, email, photoURL) are populated. */
+export { LOCAL_UID };
 const LOCAL_USER = {
   uid: LOCAL_UID,
   displayName: "Local user",
@@ -73,24 +89,79 @@ const LOCAL_USER = {
   photoURL: null,
 } as unknown as User;
 
+// localStorage flag remembering that the user picked "continue without an
+// account". Survives reloads so they don't see the Login screen every time.
+const GUEST_FLAG_KEY = "breathbase:guestMode";
+const readGuestFlag = (): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(GUEST_FLAG_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+const writeGuestFlag = (on: boolean): void => {
+  if (typeof window === "undefined") return;
+  try {
+    if (on) window.localStorage.setItem(GUEST_FLAG_KEY, "true");
+    else window.localStorage.removeItem(GUEST_FLAG_KEY);
+  } catch {
+    /* noop */
+  }
+};
+
 function FirebaseAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
+  const [isGuest, setIsGuest] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Whether the *current* sign-in attempt is upgrading a guest. Used by the
+  // onAuthStateChanged effect to decide whether to run the migration.
+  const upgradingFromGuestRef = useRef(false);
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (next) => {
-      setUser(next);
-      setStatus(next ? "signedIn" : "signedOut");
+    const unsub = onAuthStateChanged(auth, async (next) => {
+      if (next) {
+        // A real Firebase user just arrived. If they were a guest a moment
+        // ago, migrate their local data into the new account, then clear
+        // the guest flag so future reloads don't re-trigger this path.
+        const wasGuest = upgradingFromGuestRef.current || readGuestFlag();
+        upgradingFromGuestRef.current = false;
+        if (wasGuest) {
+          try {
+            await migrateGuestData(next.uid);
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error("[auth] guest migration failed:", e);
+          }
+          writeGuestFlag(false);
+        }
+        setUser(next);
+        setIsGuest(false);
+        setStatus("signedIn");
+      } else if (readGuestFlag()) {
+        // No Firebase user but the guest flag is set — present as signed
+        // in with the synthetic LOCAL_USER.
+        setUser(LOCAL_USER);
+        setIsGuest(true);
+        setStatus("signedIn");
+      } else {
+        setUser(null);
+        setIsGuest(false);
+        setStatus("signedOut");
+      }
     });
     return unsub;
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
     setError(null);
+    upgradingFromGuestRef.current = isGuest;
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (e) {
+      upgradingFromGuestRef.current = false;
       const code = (e as { code?: string }).code;
       // Popup-closed-by-user is the normal "cancel" path; don't shout about it.
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
@@ -98,34 +169,36 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
       }
       setError((e as Error).message ?? "Sign-in failed");
     }
-  }, []);
+  }, [isGuest]);
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
       setError(null);
-      // Let the caller catch and surface a friendly mapping of the Firebase
-      // error code; setting context-level `error` is just a fallback.
+      upgradingFromGuestRef.current = isGuest;
       try {
         await signInWithEmailAndPassword(auth, email, password);
       } catch (e) {
+        upgradingFromGuestRef.current = false;
         setError((e as Error).message ?? "Sign-in failed");
         throw e;
       }
     },
-    [],
+    [isGuest],
   );
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string) => {
       setError(null);
+      upgradingFromGuestRef.current = isGuest;
       try {
         await createUserWithEmailAndPassword(auth, email, password);
       } catch (e) {
+        upgradingFromGuestRef.current = false;
         setError((e as Error).message ?? "Sign-up failed");
         throw e;
       }
     },
-    [],
+    [isGuest],
   );
 
   const sendPasswordReset = useCallback(async (email: string) => {
@@ -138,13 +211,40 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const continueAsGuest = useCallback(() => {
+    writeGuestFlag(true);
+    setUser(LOCAL_USER);
+    setIsGuest(true);
+    setStatus("signedIn");
+  }, []);
+
   const signOut = useCallback(async () => {
     setError(null);
+    if (isGuest) {
+      // No Firebase session — just clear the flag. Local data stays put so
+      // the user can come back as a guest later and pick up where they left.
+      writeGuestFlag(false);
+      setUser(null);
+      setIsGuest(false);
+      setStatus("signedOut");
+      return;
+    }
+    // Clear any leftover guest flag too, so signing out always lands at
+    // the Login screen rather than auto-falling-back into guest mode.
+    writeGuestFlag(false);
     await fbSignOut(auth);
-  }, []);
+  }, [isGuest]);
 
   const deleteAccount = useCallback(async () => {
     setError(null);
+    if (isGuest) {
+      await deleteAllUserData(LOCAL_UID);
+      writeGuestFlag(false);
+      setUser(null);
+      setIsGuest(false);
+      setStatus("signedOut");
+      return;
+    }
     const current = auth.currentUser;
     if (!current) return;
     // Wipe Firestore first. If the auth deletion fails, the user can sign
@@ -180,16 +280,19 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
         throw e;
       }
     }
-  }, []);
+  }, [isGuest]);
 
   const value = useMemo(
     () => ({
       user,
       status,
+      isGuest,
+      canRegister: true,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
       sendPasswordReset,
+      continueAsGuest,
       signOut,
       deleteAccount,
       error,
@@ -197,10 +300,12 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
     [
       user,
       status,
+      isGuest,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
       sendPasswordReset,
+      continueAsGuest,
       signOut,
       deleteAccount,
       error,
@@ -211,6 +316,9 @@ function FirebaseAuthProvider({ children }: { children: ReactNode }) {
 }
 
 function LocalAuthProvider({ children }: { children: ReactNode }) {
+  // Build-time local mode (no Firebase configured): there is no sign-in /
+  // sign-out concept. The synthetic LOCAL_USER is always signed in; the
+  // only data operation that makes sense is "clear local data".
   const deleteAccount = useCallback(async () => {
     await deleteAllUserData(LOCAL_UID);
     // No auth account to remove; just reload so the in-memory state resets.
@@ -221,21 +329,14 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user: LOCAL_USER,
       status: "signedIn",
-      signInWithGoogle: async () => {
-        /* no-op in local mode */
-      },
-      signInWithEmail: async () => {
-        /* no-op in local mode */
-      },
-      signUpWithEmail: async () => {
-        /* no-op in local mode */
-      },
-      sendPasswordReset: async () => {
-        /* no-op in local mode */
-      },
-      signOut: async () => {
-        /* no-op in local mode */
-      },
+      isGuest: true,
+      canRegister: false,
+      signInWithGoogle: async () => {},
+      signInWithEmail: async () => {},
+      signUpWithEmail: async () => {},
+      sendPasswordReset: async () => {},
+      continueAsGuest: () => {},
+      signOut: async () => {},
       deleteAccount,
       error: null,
     }),

@@ -1,10 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { Link } from "react-router-dom";
+
 type Props = {
   open: boolean;
   notes: string[];
   techniqueName: string;
+  /** Show a callout suggesting the user try a calmer technique first.
+   *  Set when the user has no completed non-upregulate sessions. */
+  recommendFoundation?: boolean;
   onAcknowledge: () => void;
   onCancel: () => void;
 };
@@ -13,6 +18,7 @@ export function SafetyModal({
   open,
   notes,
   techniqueName,
+  recommendFoundation = false,
   onAcknowledge,
   onCancel,
 }: Props) {
@@ -28,6 +34,22 @@ export function SafetyModal({
         <h2 id="safety-title" className="text-xl font-medium mb-3">
           Before you begin — {techniqueName}
         </h2>
+        {recommendFoundation && (
+          <div className="mb-4 rounded-2xl bg-teal-400/10 border border-teal-400/30 px-4 py-3">
+            <p className="text-sm text-slate-800 dark:text-slate-100">
+              <strong className="font-medium">New here?</strong> Activating
+              techniques like this can be intense. We recommend starting with
+              a calmer practice first to build a baseline.
+            </p>
+            <Link
+              to="/session/box-breathing"
+              replace
+              className="mt-2 inline-flex items-center gap-1 text-sm text-teal-300 hover:text-teal-200 underline-offset-2 hover:underline"
+            >
+              Try Box Breathing first →
+            </Link>
+          </div>
+        )}
         <ul className="space-y-2 text-slate-700 dark:text-slate-300 text-sm list-disc pl-5">
           {notes.map((n, i) => (
             <li key={i}>{n}</li>

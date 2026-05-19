@@ -4,9 +4,10 @@
 // Per-user persistence for settings, session history, and derived stats.
 // All reads/writes are scoped to the caller-supplied UID.
 //
-// Two backends, switched by the `localMode` flag in firebase.ts:
-//   - Firestore (production): /users/{uid}/profile/settings + sessions/*
-//   - localStorage (local mode): JSON blobs under `breathbase:{uid}:*`
+// Two backends, switched per-call by the UID:
+//   - localStorage when `uid === LOCAL_UID` — covers both build-time local
+//     mode AND runtime guests who chose "continue without an account".
+//   - Firestore otherwise — the user is signed in with a real Firebase UID.
 //
 // Stats (streak, totalMinutes, lastSession) remain pure functions over a
 // SessionEntry[] — they don't know about either backend.
@@ -23,7 +24,7 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
-import { db, localMode } from "./firebase";
+import { db, isLocalUid, LOCAL_UID } from "./firebase";
 import { DEFAULT_VOICE_PROFILE } from "./voiceProfiles";
 import { DEFAULT_PROGRAM_STATE, type ProgramState } from "./program";
 
@@ -73,6 +74,10 @@ export type Settings = {
   lastDismissedSuggestionDate: string;
   onboarded: boolean;
   disclaimerAcknowledged: boolean;
+  /** Technique IDs whose pre-session safety notes the user has already
+   *  acknowledged. Used to make the safety modal one-time per technique;
+   *  the notes are still shown inline in the Get Ready phase on every run. */
+  acknowledgedSafety: string[];
   /** Opt-out for the self-hosted Umami analytics. No-op when the build
    *  wasn't configured with VITE_UMAMI_* anyway. Default on. */
   analyticsEnabled: boolean;
@@ -103,6 +108,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastDismissedSuggestionDate: "",
   onboarded: false,
   disclaimerAcknowledged: false,
+  acknowledgedSafety: [],
   analyticsEnabled: true,
   liteMusicMode: "auto",
 };
@@ -158,7 +164,7 @@ const localLoadSettings = (uid: string): Settings => {
 // ---------------------------------------------------------------------------
 
 export const loadSettings = async (uid: string): Promise<Settings> => {
-  if (localMode) return localLoadSettings(uid);
+  if (isLocalUid(uid)) return localLoadSettings(uid);
   const snap = await getDoc(settingsDoc(uid));
   if (!snap.exists()) return DEFAULT_SETTINGS;
   const data = snap.data() as Partial<Settings>;
@@ -172,7 +178,7 @@ export const loadSettings = async (uid: string): Promise<Settings> => {
 };
 
 export const saveSettings = async (uid: string, s: Settings): Promise<void> => {
-  if (localMode) {
+  if (isLocalUid(uid)) {
     lsWriteJson(lsKey(uid, "settings"), s);
     return;
   }
@@ -184,7 +190,7 @@ export const saveSettings = async (uid: string, s: Settings): Promise<void> => {
 // ---------------------------------------------------------------------------
 
 export const loadHistory = async (uid: string): Promise<SessionEntry[]> => {
-  if (localMode) {
+  if (isLocalUid(uid)) {
     const list = lsReadJson<SessionEntry[]>(lsKey(uid, "sessions"), []);
     return list
       .slice()
@@ -204,7 +210,7 @@ export const appendHistory = async (
   uid: string,
   entry: Omit<SessionEntry, "id">,
 ): Promise<void> => {
-  if (localMode) {
+  if (isLocalUid(uid)) {
     const list = lsReadJson<SessionEntry[]>(lsKey(uid, "sessions"), []);
     const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     // Cap to 1000 to bound localStorage growth (well above the read cap).
@@ -265,7 +271,7 @@ export const exportAllUserData = async (
   settings: Settings | null;
   sessions: SessionEntry[];
 }> => {
-  if (localMode) {
+  if (isLocalUid(uid)) {
     return {
       exportedAt: new Date().toISOString(),
       uid,
@@ -297,7 +303,7 @@ export const exportAllUserData = async (
  * clears the corresponding localStorage entries.
  */
 export const deleteAllUserData = async (uid: string): Promise<void> => {
-  if (localMode) {
+  if (isLocalUid(uid)) {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.removeItem(lsKey(uid, "settings"));
@@ -326,4 +332,86 @@ export const deleteAllUserData = async (uid: string): Promise<void> => {
   await deleteDoc(settingsDoc(uid)).catch(() => {
     // The settings doc may not exist yet for brand-new users; treat as no-op.
   });
+};
+
+// ---------------------------------------------------------------------------
+// Guest → Firebase migration
+// ---------------------------------------------------------------------------
+
+/**
+ * Copy a guest user's locally-stored settings and sessions to their new
+ * Firebase account, then clear the local copy.
+ *
+ * Conflict policy: if the target account already has a settings doc, we
+ * keep the Firestore version (returning user). Sessions are always
+ * additive — they're immutable history events, so merging never loses
+ * data even if the same device practiced both as guest and signed-in.
+ */
+export const migrateGuestData = async (toUid: string): Promise<void> => {
+  if (isLocalUid(toUid)) return; // nothing to migrate to
+  if (typeof window === "undefined") return;
+
+  const localSettings = lsReadJson<Partial<Settings> | null>(
+    lsKey(LOCAL_UID, "settings"),
+    null,
+  );
+  const localSessions = lsReadJson<SessionEntry[]>(lsKey(LOCAL_UID, "sessions"), []);
+
+  // Settings: only write if the Firebase user has no settings doc yet.
+  if (localSettings) {
+    try {
+      const existing = await getDoc(settingsDoc(toUid));
+      if (!existing.exists()) {
+        await setDoc(
+          settingsDoc(toUid),
+          {
+            ...DEFAULT_SETTINGS,
+            ...localSettings,
+            program: {
+              ...DEFAULT_PROGRAM_STATE,
+              ...(localSettings.program ?? {}),
+            },
+          },
+          { merge: true },
+        );
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[migrate] settings copy failed:", e);
+    }
+  }
+
+  // Sessions: append all local sessions with new Firestore-generated IDs.
+  if (localSessions.length > 0) {
+    try {
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const s of localSessions) {
+        // Strip the synthetic local-* id so Firestore generates a fresh one.
+        const { id: _id, ...payload } = s;
+        void _id;
+        batch.set(doc(sessionsCol(toUid)), payload);
+        count += 1;
+        if (count >= 500) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+      if (count > 0) await batch.commit();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[migrate] sessions copy failed:", e);
+    }
+  }
+
+  // Clear the guest copy regardless — if either step above failed, we've
+  // already logged it; leaving the local copy around would mean the next
+  // guest sign-up tries to migrate the same data again.
+  try {
+    window.localStorage.removeItem(lsKey(LOCAL_UID, "settings"));
+    window.localStorage.removeItem(lsKey(LOCAL_UID, "sessions"));
+  } catch {
+    /* noop */
+  }
 };

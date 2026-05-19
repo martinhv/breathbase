@@ -9,7 +9,6 @@ import { useSpeech } from "@/hooks/useSpeech";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { exportAllUserData, type Soundscape } from "@/lib/storage";
-import { localMode } from "@/lib/firebase";
 import { TECHNIQUES } from "@/lib/techniques";
 import { VOICE_PROFILES } from "@/lib/voiceProfiles";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
@@ -167,7 +166,7 @@ const Collapse = ({ title, hint, defaultOpen = false, children }: CollapseProps)
 
 export function Settings() {
   const { settings, update, reset } = useSettings();
-  const { user, signOut, deleteAccount } = useAuth();
+  const { user, isGuest, canRegister, signOut, deleteAccount } = useAuth();
   const { preview } = useSpeech();
   const audio = useAudioEngine();
   const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -188,7 +187,7 @@ export function Settings() {
   // edits it. The server function reads from Firestore each tick, so a
   // late write is enough — no need to re-prompt the user.
   useEffect(() => {
-    if (!settings.reminderEnabled || !user) return;
+    if (!settings.reminderEnabled || !user || isGuest) return;
     if (!isPushAvailable()) return;
     if (notifPermission !== "granted") return;
     let cancelled = false;
@@ -208,6 +207,7 @@ export function Settings() {
     settings.reminderEnabled,
     settings.reminderTime,
     user,
+    isGuest,
     notifPermission,
   ]);
 
@@ -247,7 +247,7 @@ export function Settings() {
 
   const onDeleteAccount = async () => {
     if (!user) return;
-    const message = localMode
+    const message = isGuest
       ? "Clear all locally-stored settings and session history? This cannot be undone."
       : "Delete your account and all session history? This cannot be undone.";
     const ok = confirm(message);
@@ -259,12 +259,22 @@ export function Settings() {
       // eslint-disable-next-line no-console
       console.error("Delete failed:", e);
       alert(
-        localMode
+        isGuest
           ? "Could not clear local data. Please try again."
           : "Account deletion failed. Please try again.",
       );
       setDeleting(false);
     }
+  };
+
+  const onSignUpFromGuest = () => {
+    const ok = confirm(
+      "Sign up to sync your settings and history across devices. " +
+        "Your existing data will be carried over to the new account. Continue?",
+    );
+    if (!ok) return;
+    track("guest_sign_up_intent");
+    void signOut();
   };
 
   return (
@@ -284,7 +294,7 @@ export function Settings() {
       {user && (
         <section className="mb-4">
           <div className="rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 p-4 flex items-center gap-3">
-            {user.photoURL ? (
+            {!isGuest && user.photoURL ? (
               <img
                 src={user.photoURL}
                 alt=""
@@ -293,20 +303,28 @@ export function Settings() {
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-slate-900/5 dark:bg-white/10 flex items-center justify-center text-slate-700 dark:text-slate-300">
-                {(user.displayName ?? user.email ?? "?").charAt(0).toUpperCase()}
+                {isGuest
+                  ? "👤"
+                  : (user.displayName ?? user.email ?? "?").charAt(0).toUpperCase()}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              {user.displayName && (
+              {isGuest ? (
                 <div className="text-sm text-slate-800 dark:text-slate-200 truncate">
-                  {user.displayName}
+                  Guest mode
                 </div>
+              ) : (
+                user.displayName && (
+                  <div className="text-sm text-slate-800 dark:text-slate-200 truncate">
+                    {user.displayName}
+                  </div>
+                )
               )}
               <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                {localMode ? "Data stays on this device" : user.email}
+                {isGuest ? "Data stays on this device" : user.email}
               </div>
             </div>
-            {!localMode && (
+            {!isGuest && (
               <button
                 onClick={() => {
                   if (confirm("Sign out?")) void signOut();
@@ -317,6 +335,17 @@ export function Settings() {
               </button>
             )}
           </div>
+
+          {/* Guests who CAN register: encourage syncing across devices. */}
+          {isGuest && canRegister && (
+            <button
+              onClick={onSignUpFromGuest}
+              className="w-full mt-2 px-4 py-3 rounded-2xl bg-teal-400/90 text-ink-950 text-sm font-medium hover:bg-teal-300 flex items-center justify-between"
+            >
+              <span>Sign up to sync across devices</span>
+              <span aria-hidden>→</span>
+            </button>
+          )}
         </section>
       )}
 
@@ -694,7 +723,7 @@ export function Settings() {
                 className="w-full flex items-center justify-between py-3 text-sm text-red-300/90 hover:opacity-90 disabled:opacity-50"
               >
                 <span>
-                  {localMode ? "Clear local data" : "Delete account and all data"}
+                  {isGuest ? "Clear local data" : "Delete account and all data"}
                 </span>
                 <span className="text-xs text-red-300/70">
                   {deleting ? "Deleting…" : "Permanent"}

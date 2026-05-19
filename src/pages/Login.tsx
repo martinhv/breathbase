@@ -40,16 +40,23 @@ export function Login() {
     signInWithEmail,
     signUpWithEmail,
     sendPasswordReset,
+    continueAsGuest,
     error: contextError,
   } = useAuth();
 
   const [googleBusy, setGoogleBusy] = useState(false);
   const [emailBusy, setEmailBusy] = useState(false);
+  const [showSignIn, setShowSignIn] = useState(false);
   const [mode, setMode] = useState<EmailMode>("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [resetInfo, setResetInfo] = useState<string | null>(null);
+
+  const onGuest = () => {
+    track("continue_as_guest");
+    continueAsGuest();
+  };
 
   const onGoogle = async () => {
     setGoogleBusy(true);
@@ -117,123 +124,148 @@ export function Login() {
             Foundational breathwork, grounded in science.
           </p>
         </div>
-        <p className="text-slate-700 dark:text-slate-300 text-sm max-w-xs leading-relaxed">
-          Sign in to sync your settings, streak, and practice history across
-          devices.
-        </p>
       </div>
 
       <div className="flex flex-col gap-3">
+        {/* Primary CTA — no friction. Lands you straight in the app. */}
         <button
-          onClick={onGoogle}
+          onClick={onGuest}
           disabled={googleBusy || emailBusy}
-          className="w-full px-5 py-3 rounded-2xl bg-white text-ink-950 font-medium hover:bg-slate-100 disabled:opacity-60 flex items-center justify-center gap-3"
+          className="w-full px-5 py-3.5 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300 disabled:opacity-60 inline-flex items-center justify-center gap-2"
         >
-          <GoogleMark />
-          {googleBusy ? "Signing in…" : "Continue with Google"}
+          <span>Take a breath</span>
+          <span aria-hidden>→</span>
         </button>
-
-        <div className="flex items-center gap-3 py-1">
-          <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
-          <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            or
-          </span>
-          <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
-        </div>
-
-        <form onSubmit={onEmailSubmit} className="flex flex-col gap-2">
-          <label className="sr-only" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            required
-            className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
-          />
-          <label className="sr-only" htmlFor="password">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete={mode === "signIn" ? "current-password" : "new-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            required
-            minLength={6}
-            className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
-          />
-          <button
-            type="submit"
-            disabled={emailBusy || googleBusy}
-            className="w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300 disabled:opacity-60"
-          >
-            {emailBusy
-              ? mode === "signIn"
-                ? "Signing in…"
-                : "Creating account…"
-              : mode === "signIn"
-                ? "Sign in"
-                : "Create account"}
-          </button>
-        </form>
-
-        <div className="flex items-center justify-between text-[12px] text-slate-600 dark:text-slate-400 px-1">
+        {!showSignIn ? (
           <button
             type="button"
-            onClick={() => {
-              setMode((m) => (m === "signIn" ? "signUp" : "signIn"));
-              setFormError(null);
-              setResetInfo(null);
-            }}
-            className="hover:underline underline-offset-2"
+            onClick={() => setShowSignIn(true)}
+            className="mt-3 text-xs text-slate-600 dark:text-slate-400 hover:underline underline-offset-2"
           >
-            {mode === "signIn"
-              ? "Need an account? Create one"
-              : "Have an account? Sign in"}
+            Sign in to sync across devices
           </button>
-          {mode === "signIn" && (
+        ) : (
+          <>
+            <div className="flex items-center gap-3 py-1 mt-3">
+              <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                or sync across devices
+              </span>
+              <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
+            </div>
+
             <button
-              type="button"
-              onClick={onForgotPassword}
-              className="hover:underline underline-offset-2"
+              onClick={onGoogle}
+              disabled={googleBusy || emailBusy}
+              className="w-full px-5 py-3 rounded-2xl bg-white text-ink-950 font-medium hover:bg-slate-100 disabled:opacity-60 flex items-center justify-center gap-3"
             >
-              Forgot password?
+              <GoogleMark />
+              {googleBusy ? "Signing in…" : "Continue with Google"}
             </button>
-          )}
-        </div>
 
-        {displayError && (
-          <p role="alert" className="text-xs text-red-300 text-center">
-            {displayError}
-          </p>
-        )}
-        {resetInfo && (
-          <p role="status" className="text-xs text-teal-300 text-center">
-            {resetInfo}
-          </p>
+            <div className="flex items-center gap-3 py-1">
+              <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                or
+              </span>
+              <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
+            </div>
+
+            <form onSubmit={onEmailSubmit} className="flex flex-col gap-2">
+              <label className="sr-only" htmlFor="email">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                required
+                className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
+              />
+              <label className="sr-only" htmlFor="password">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete={mode === "signIn" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                required
+                minLength={6}
+                className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
+              />
+              <button
+                type="submit"
+                disabled={emailBusy || googleBusy}
+                className="w-full px-5 py-3 rounded-2xl bg-slate-900/[0.06] dark:bg-white/10 text-slate-800 dark:text-slate-100 font-medium hover:bg-slate-900/10 dark:hover:bg-white/15 disabled:opacity-60"
+              >
+                {emailBusy
+                  ? mode === "signIn"
+                    ? "Signing in…"
+                    : "Creating account…"
+                  : mode === "signIn"
+                    ? "Sign in"
+                    : "Create account"}
+              </button>
+            </form>
+
+            <div className="flex items-center justify-between text-[12px] text-slate-600 dark:text-slate-400 px-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode((m) => (m === "signIn" ? "signUp" : "signIn"));
+                  setFormError(null);
+                  setResetInfo(null);
+                }}
+                className="hover:underline underline-offset-2"
+              >
+                {mode === "signIn"
+                  ? "Need an account? Create one"
+                  : "Have an account? Sign in"}
+              </button>
+              {mode === "signIn" && (
+                <button
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="hover:underline underline-offset-2"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
+
+            {displayError && (
+              <p role="alert" className="text-xs text-red-300 text-center">
+                {displayError}
+              </p>
+            )}
+            {resetInfo && (
+              <p role="status" className="text-xs text-teal-300 text-center">
+                {resetInfo}
+              </p>
+            )}
+          </>
         )}
 
-        <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center max-w-xs mx-auto leading-relaxed pt-2">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center max-w-xs mx-auto leading-relaxed pt-3">
           By continuing you agree to use this app as an educational tool, not
           medical advice. See safety details after sign-in.
         </p>
         <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center pt-2">
-          Open source —{" "}
+          Built with love for{" "}
           <a
             href={SOURCE_URL}
             target="_blank"
             rel="noreferrer"
             className="underline-offset-2 hover:underline"
           >
-            view source
+            open source
           </a>
           {" · "}
           <a
