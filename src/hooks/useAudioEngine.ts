@@ -281,8 +281,11 @@ class AudioEngineImpl {
     }).connect(this.celloFilter);
     // Cap voice allocation tight, but leave headroom for the previous voice
     // to finish its release envelope while the new one attacks. With cap=1
-    // the prior voice can't free up in time on bellows-rate chord changes.
-    this.cello.maxPolyphony = lite ? 2 : 4;
+    // the prior voice can't free up in time on bellows-rate chord changes;
+    // even cap=2 is at the arithmetic limit (1 in release + 1 new) once
+    // the ~2.5s release tail overlaps the 8s chord throttle, so cap=3 in
+    // lite gives one voice of margin for timing drift.
+    this.cello.maxPolyphony = lite ? 3 : 4;
     this.cello.volume.value = -4;
 
     // ── Pad layer (choir-like, mid register) ───────────────────────────
@@ -320,10 +323,13 @@ class AudioEngineImpl {
         release: lite ? 2.5 : 5,
       },
     }).connect(this.padFilter);
-    // Pad holds 2 chord tones; cap=4 gives one chord's worth of headroom for
-    // the prior voices to finish their release envelope. In lite mode the
-    // envelope is short enough that cap=2 wasn't quite tight — bump to 3.
-    this.pad.maxPolyphony = lite ? 3 : 4;
+    // Pad holds 2 chord tones, so a chord change momentarily needs 4 voices
+    // (2 prior still tailing + 2 new). cap=4 in non-lite is exactly at that
+    // limit — any timing drift or reverb-tail accounting pushes over and
+    // Tone.js drops a note. Bump by 1 in each mode so we have a free voice
+    // of headroom; PolySynth allocates voices lazily so the higher cap is
+    // free until actually needed.
+    this.pad.maxPolyphony = lite ? 4 : 5;
     // PolySynth's per-voice volume is a touch hot at default; tame it here.
     this.pad.volume.value = -6;
 
