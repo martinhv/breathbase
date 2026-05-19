@@ -8,6 +8,34 @@ import { DEFAULT_SETTINGS, type Settings } from "@/lib/storage";
 import { DEFAULT_CHIME_HZ, type PhaseKind } from "@/lib/techniques";
 import type { Soundscape } from "@/lib/storage";
 
+// Switch the AudioContext to a larger render buffer on mobile devices BEFORE
+// any Tone.js node is constructed. Tone.js will lazily create its context on
+// first use (e.g. when `Tone.start()` runs); once that happens the latencyHint
+// is frozen. So this guard runs at module load and must complete before
+// AudioEngineImpl methods touch Tone.
+//
+// "interactive" (Tone.js default): ~10 ms buffer. Snappy chime/voice cueing
+// on desktop but every CPU spike risks an underrun = audible stutter.
+// "playback":                      ~256 ms buffer. Adds latency to chimes
+// and music-start but absorbs spikes without dropouts — the right trade for
+// breathwork on a throttled mid-tier phone. Voice prompts via HTMLAudioElement
+// aren't affected (they don't route through Tone's context).
+//
+// Gated on `pointer: coarse`, which matches touch-primary devices (phones +
+// tablets) without false-positiving on desktops connected to touchscreens —
+// those still report a fine pointer for the mouse.
+if (typeof window !== "undefined") {
+  try {
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      Tone.setContext(new Tone.Context({ latencyHint: "playback" }));
+      // eslint-disable-next-line no-console
+      console.info("[audio] latencyHint=playback (mobile)");
+    }
+  } catch {
+    /* matchMedia or Tone.Context unavailable — fall back to defaults. */
+  }
+}
+
 /**
  * Module-level audio engine singleton.
  *
