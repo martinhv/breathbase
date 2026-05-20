@@ -34,6 +34,21 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          {
+            // Pre-rendered pad clips for the piano soundscape. 8 small mp3s
+            // (~2 MB total). Cached on first play so subsequent sessions
+            // (and offline use) start instantly.
+            urlPattern: ({ url }) => url.pathname.startsWith("/sounds/"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "bb-sound-clips",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
       manifest: {

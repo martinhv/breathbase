@@ -86,7 +86,7 @@ The service worker precaches all `*.mp3`, so all voices are available offline af
 
 ### Audio (`hooks/useAudioEngine.ts`)
 
-Tone.js is lazy-initialized on the user's first gesture (browser autoplay policy). The ambient pad is a `PolySynth` (C2+G2+D3+A3) through a low-pass with a slow LFO and 12 s reverb. Chimes are a sine `Synth` fired on `onPhaseEnter`; default frequencies per phase kind are in `DEFAULT_CHIME_HZ` in `techniques.ts` and can be overridden per-phase via `chimeFreqHz`.
+Tone.js is lazy-initialized on the user's first gesture (browser autoplay policy). The piano arpeggios are a `Tone.Sampler` (Salamander Grand, CDN-hosted) scheduled per-phase from `playPhrase()`. The ambient pad bed is **pre-rendered**: eight `Tone.Player` instances load `public/sounds/pad-chord-{0..7}.mp3` (one mp3 per chord in the 8-chord progression), and `triggerHarmony()` crossfades between them when the harmony advances. The synthesized cello/pad/strings/noise ensemble that used to run live was retired so the audible result is identical across devices — bake the clips by opening `scripts/render-pad-clips.html` in a browser and running `scripts/encode-pad-clips.sh`. Chimes are a sine `Synth` fired on `onPhaseEnter`; default frequencies per phase kind are in `DEFAULT_CHIME_HZ` in `techniques.ts` and can be overridden per-phase via `chimeFreqHz`.
 
 ### Routing (`App.tsx`)
 

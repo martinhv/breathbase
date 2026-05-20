@@ -7,8 +7,8 @@ BreathBase is a mobile-first PWA for guided breathwork. It covers the
 control — with nine evidence-based techniques across four states:
 downregulate, upregulate, balance, and focus.
 
-The app uses a layered piano + strings + cello + pad ensemble (Tone.js, plus
-optional ocean / rain / brown-noise / silent soundscapes), an animated
+The app uses a piano sampler (Tone.js) over a pre-rendered ambient pad bed,
+plus optional ocean / rain / brown-noise / silent soundscapes; an animated
 breathing orb (Framer Motion) tightly synchronized to the breath cycle,
 optional MP3 voice guidance, and haptic feedback. Five curated 7-day
 programs (foundations, sleep, stress reset, focus, energy) introduce the
@@ -242,9 +242,10 @@ into your `.env` and `docker compose up -d --build` to bake them in.
 - **React 18 + TypeScript** via Vite
 - **Tailwind CSS** for styling (light/dark with system-follow option)
 - **Framer Motion** for the orb animation
-- **Tone.js** — piano sampler (Salamander Grand, CDN-hosted) + synthesized
-  strings / cello / pad / bell / brushed snare layers, plus alternative
-  ocean / rain / brown-noise soundscapes (procedural — no sample assets)
+- **Tone.js** — piano sampler (Salamander Grand, CDN-hosted) for the
+  arpeggios, pre-rendered MP3 pad clips (one per chord) for the ambient
+  bed, plus a sparse FM bell and brushed-snare layer; alternative ocean /
+  rain / brown-noise soundscapes are procedural
 - **Pre-rendered MP3 voice prompts** — five Microsoft neural voices via
   `edge-tts` plus an ElevenLabs "premium" voice (Oliver), all generated
   by `scripts/generate-voice.sh` and cached by the service worker; user
@@ -351,26 +352,37 @@ A module-level Tone.js singleton, lazily initialized on the user's first
 gesture (autoplay policy). Music is **driven by the breath cycle**, not
 a fixed timer.
 
-The default "piano" soundscape layers an ensemble under the breath:
+The default "piano" soundscape layers two elements under the breath:
 
 - **Piano sampler** (Salamander Grand from the Tone.js CDN) plays
   ascending arpeggios on inhale, descending on exhale, a held chord with
-  a high accent on hold-in, low cluster on hold-out.
-- **Cello-bass** — fat-saw `PolySynth` low-passed at 450 Hz, sustaining
-  the chord root between piano bass triggers.
-- **Pad** — fat-triangle `PolySynth` low-passed with a 0.07 Hz LFO,
-  playing the lower-mid chord tones for warmth.
-- **Strings** — fat-saw `PolySynth` through `Tone.Chorus` + a 0.05 Hz
-  filter LFO, playing the upper chord tones. The most audible new
-  layer; swells with each chord change.
+  a high accent on hold-in, low cluster on hold-out. Each arpeggio is
+  scheduled to exactly fit the phase's duration, so a 5 s inhale gets a
+  5 s arpeggio and a 2 s inhale gets a 2 s arpeggio.
+- **Pad clips** — eight pre-rendered 24 s mp3s at `public/sounds/
+  pad-chord-{0..7}.mp3`, one per chord in the progression. Each clip
+  contains the original synthesized ensemble (cello + warm pad + bowed
+  strings + air noise), baked offline so runtime cost is just buffer
+  playback — no oscillators, no LFOs, no chorus, no polyphony budget to
+  blow. When the harmony advances, the previous chord's player fades
+  out (1.5 s) while the next starts from its baked attack — a natural
+  crossfade. Same audible result on every device, no lite-mode toggle.
 - **Bell** — sparse FM bell on C6, rings each time the 8-chord progression
   wraps a full pass (~1–2 min depending on technique).
 - **Brushed snare** — pink-noise swell that fires only at round boundaries
   in rounds-layout techniques (active cycling → rest, rest → active). So
   it only shows up in Energizing Breath and Bellows Breath.
-- **Air** — quiet band-passed pink noise (~-30 dB) for subliminal motion.
 - **Chimes** — sine `Synth` per-phase, frequencies in `DEFAULT_CHIME_HZ`
   (inhale 440 Hz, hold 330 Hz, exhale 220 Hz; overridable per phase).
+
+To **regenerate the pad clips** (e.g. after editing the synth definitions
+in `scripts/render-pad-clips.html`):
+
+1. Open `scripts/render-pad-clips.html` in a desktop browser.
+2. Click "Render all 8 clips" — the browser downloads
+   `pad-chord-0.wav` through `pad-chord-7.wav`.
+3. Run `./scripts/encode-pad-clips.sh ~/Downloads` to encode the WAVs as
+   MP3s and copy them into `public/sounds/`.
 
 The chord progression walks through 8 voicings in C major / A minor
 (vi-IV-I-V then iii-vi-ii-V). A `passIndex` counter increments on each

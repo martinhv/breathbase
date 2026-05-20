@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>BreathBase — Pad clip render</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #222; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 0.2rem; }
+  pre { background: #f4f4f4; padding: 0.75rem; border-radius: 0.4rem; overflow-x: auto; font-size: 0.8rem; max-height: 18rem; }
+  button { font-size: 1rem; padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: 1px solid #888; cursor: pointer; background: #fff; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .row { margin: 0.75rem 0; display: flex; gap: 1rem; align-items: center; }
+  .status { color: #555; font-size: 0.9rem; }
+  h1 { margin-bottom: 0.25rem; }
+  p.lead { color: #555; margin-top: 0; }
+</style>
+</head>
+<body>
+
+<h1>Pad clip render</h1>
+<p class="lead">
+  Bakes the 8 chord pad clips (cello + pad + strings + air noise) into
+  <code>pad-chord-0.wav</code> through <code>pad-chord-7.wav</code>.
+</p>
+
+<p>
+  Open this file in a desktop browser (Chrome/Firefox) and click the button.
+  The browser will trigger 8 file downloads. Then run
+  <code>scripts/encode-pad-clips.sh ~/Downloads</code> to convert to MP3 and
+  place the files in <code>public/sounds/</code>.
+</p>
+
+<p>
+  Each clip is 24 s long: ~3 s attack swell, ~18 s sustained body, ~3 s release tail.
+  The runtime engine crossfades between clips when the chord progression advances.
+</p>
+
+<div class="row">
+  <button id="render">Render all 8 clips</button>
+  <span id="status" class="status">Ready.</span>
+</div>
+
+<pre id="log"></pre>
+
+<script type="module">
+import * as Tone from "https://esm.sh/tone@15.0.4";
+
+// ── PROGRESSION — keep in sync with src/hooks/useAudioEngine.ts ────────
+const PROGRESSION = [
+  { bass: "A2", notes: ["A3", "C4", "E4", "G4", "B4"] },     // Am9
+  { bass: "F2", notes: ["F3", "A3", "C4", "E4", "G4"] },     // Fmaj9
+  { bass: "C3", notes: ["C4", "E4", "G4", "B4", "D5"] },     // Cmaj9
+  { bass: "G2", notes: ["G3", "C4", "D4", "E4", "A4"] },     // G6sus4
+  { bass: "E3", notes: ["E3", "G3", "B3", "D4", "F#4"] },    // Em9
+  { bass: "A2", notes: ["E4", "G4", "B4", "D5", "E5"] },     // Am11 (higher)
+  { bass: "D3", notes: ["F3", "A3", "C4", "E4", "G4"] },     // Dm9
+  { bass: "G2", notes: ["G3", "C4", "D4", "F4", "A4"] },     // G7sus4
+];
+
+const CLIP_DURATION_S = 24;
+const RELEASE_TIME_S = 21;
+const SAMPLE_RATE = 44100;
+
+async function renderChord(idx) {
+  const chord = PROGRESSION[idx];
+  const padNotes = chord.notes.slice(0, 2);
+  const stringsNotes = chord.notes.slice(2, 5);
+
+  // Tone.Offline takes (callback, duration, channels?, sampleRate?). The
+  // callback runs against an OfflineContext; nodes constructed inside route
+  // to that context's destination, so toDestination() works as expected.
+  const buf = await Tone.Offline(async () => {
+    // ── Cello: synth → filter → output volume (-16 dB) → destination ──
+    const celloOut = new Tone.Volume(-16).toDestination();
+    const celloFilter = new Tone.Filter({ frequency: 450, type: "lowpass", Q: 1 }).connect(celloOut);
+    const cello = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "fatsawtooth", count: 2, spread: 12 },
+      envelope: { attack: 3, decay: 1.2, sustain: 0.75, release: 6 },
+    }).connect(celloFilter);
+    cello.maxPolyphony = 4;
+    cello.volume.value = -4;
+
+    // ── Pad: synth → LFO-swept filter → output (-14 dB) → destination ──
+    const padOut = new Tone.Volume(-14).toDestination();
+    const padFilter = new Tone.Filter({ frequency: 700, type: "lowpass", Q: 0.8 }).connect(padOut);
+    const padLfo = new Tone.LFO({ frequency: 0.07, min: 400, max: 1100, type: "sine" })
+      .connect(padFilter.frequency);
+    padLfo.start();
+    const pad = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "fattriangle", count: 3, spread: 18 },
+      envelope: { attack: 3, decay: 1.5, sustain: 0.8, release: 5 },
+    }).connect(padFilter);
+    pad.maxPolyphony = 5;
+    pad.volume.value = -6;
+
+    // ── Strings: synth → chorus → LFO-swept filter → output (-20 dB) ──
+    const stringsOut = new Tone.Volume(-20).toDestination();
+    const stringsChorus = new Tone.Chorus({
+      frequency: 0.6, delayTime: 4, depth: 0.5, spread: 180, wet: 0.4,
+    }).connect(stringsOut).start();
+    const stringsFilter = new Tone.Filter({ frequency: 1400, type: "lowpass", Q: 0.7 })
+      .connect(stringsChorus);
+    const stringsLfo = new Tone.LFO({ frequency: 0.05, min: 900, max: 2000, type: "sine" })
+      .connect(stringsFilter.frequency);
+    stringsLfo.start();
+    const strings = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "fatsawtooth", count: 3, spread: 28 },
+      envelope: { attack: 1.5, decay: 0.8, sustain: 0.75, release: 4 },
+    }).connect(stringsFilter);
+    strings.volume.value = -8;
+
+    // ── Air noise: pink → LFO-swept bandpass → output volume ──────────
+    // Output volume ramps -Inf → -30 dB over 2.5 s (matching startMusic).
+    const noiseOut = new Tone.Volume(-Infinity).toDestination();
+    const noiseFilter = new Tone.Filter({ frequency: 700, type: "bandpass", Q: 1.5 }).connect(noiseOut);
+    const noiseLfo = new Tone.LFO({ frequency: 0.04, min: 400, max: 1400, type: "sine" })
+      .connect(noiseFilter.frequency);
+    noiseLfo.start();
+    const noise = new Tone.Noise("pink").connect(noiseFilter);
+    noise.start();
+    noiseOut.volume.rampTo(-30, 2.5);
+
+    // ── Trigger all layers at t=0; release at t=21 (3 s natural tail) ─
+    cello.triggerAttack([chord.bass], 0);
+    pad.triggerAttack(padNotes, 0);
+    strings.triggerAttack(stringsNotes, 0);
+
+    cello.triggerRelease([chord.bass], RELEASE_TIME_S);
+    pad.triggerRelease(padNotes, RELEASE_TIME_S);
+    strings.triggerRelease(stringsNotes, RELEASE_TIME_S);
+    noiseOut.volume.rampTo(-Infinity, 2, RELEASE_TIME_S);
+  }, CLIP_DURATION_S, 2, SAMPLE_RATE);
+
+  return buf.get(); // AudioBuffer
+}
+
+// 16-bit PCM WAV encoder. Stereo, sample-interleaved.
+function audioBufferToWav(buf) {
+  const numChannels = buf.numberOfChannels;
+  const sampleRate = buf.sampleRate;
+  const numFrames = buf.length;
+  const bytesPerSample = 2;
+  const blockAlign = numChannels * bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = numFrames * blockAlign;
+  const ab = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(ab);
+  let off = 0;
+  const writeStr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(off++, s.charCodeAt(i)); };
+  const writeU32 = (v) => { view.setUint32(off, v, true); off += 4; };
+  const writeU16 = (v) => { view.setUint16(off, v, true); off += 2; };
+  writeStr("RIFF"); writeU32(36 + dataSize); writeStr("WAVE");
+  writeStr("fmt "); writeU32(16); writeU16(1); writeU16(numChannels);
+  writeU32(sampleRate); writeU32(byteRate); writeU16(blockAlign); writeU16(bytesPerSample * 8);
+  writeStr("data"); writeU32(dataSize);
+  const channels = [];
+  for (let c = 0; c < numChannels; c++) channels.push(buf.getChannelData(c));
+  for (let f = 0; f < numFrames; f++) {
+    for (let c = 0; c < numChannels; c++) {
+      let s = channels[c][f];
+      if (s > 1) s = 1; else if (s < -1) s = -1;
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      off += 2;
+    }
+  }
+  return new Blob([ab], { type: "audio/wav" });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const log = document.getElementById("log");
+const statusEl = document.getElementById("status");
+const btn = document.getElementById("render");
+const append = (s) => { log.textContent += s + "\n"; log.scrollTop = log.scrollHeight; };
+
+btn.addEventListener("click", async () => {
+  btn.disabled = true;
+  log.textContent = "";
+  statusEl.textContent = "Rendering…";
+  try {
+    for (let i = 0; i < PROGRESSION.length; i++) {
+      statusEl.textContent = `Rendering chord ${i + 1} of ${PROGRESSION.length}…`;
+      const c = PROGRESSION[i];
+      append(`[${i}] bass=${c.bass}, notes=[${c.notes.join(", ")}]`);
+      const ab = await renderChord(i);
+      const wav = audioBufferToWav(ab);
+      downloadBlob(wav, `pad-chord-${i}.wav`);
+      append(`    → pad-chord-${i}.wav  (${(wav.size / 1024).toFixed(0)} KB, ${ab.duration.toFixed(2)} s, ${ab.numberOfChannels}ch @ ${ab.sampleRate} Hz)`);
+      // Give the browser a beat to flush each download.
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    statusEl.textContent = "Done. Next: scripts/encode-pad-clips.sh ~/Downloads";
+    append("\nAll 8 clips rendered.");
+  } catch (e) {
+    statusEl.textContent = "Error — see log";
+    append("ERROR: " + (e && e.stack ? e.stack : e));
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
