@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Available built-in voice profiles. Each profile has its own subdirectory
-// under public/voice/{id}/ with one mp3 per prompt slug.
+// under public/voice/{id}/ with one mp3 per prompt slug. All voices are
+// rendered by ElevenLabs — the edge-tts (free Microsoft neural) engine was
+// dropped after premium-voice tuning settled on ElevenLabs for quality.
 //
 // To add a profile:
 //   1. Append an entry here.
-//   2. Add the same id + engine row to scripts/generate-voice.sh.
+//   2. Add the same id + ElevenLabs voice row to scripts/generate-voice.sh.
 //   3. Run ./scripts/generate-voice.sh and commit the new mp3s.
 
 export type VoiceProfile = {
@@ -16,44 +18,11 @@ export type VoiceProfile = {
   name: string;
   /** One-line description / accent + tone. */
   description: string;
-  /** Source voice (edge-tts name or ElevenLabs voice id). Informational. */
+  /** Source voice (ElevenLabs voice id). Informational. */
   sourceVoice: string;
 };
 
 export const VOICE_PROFILES: VoiceProfile[] = [
-  // Standard edge-tts voices temporarily disabled during premium-voice
-  // tuning. Re-enable by un-commenting; mp3 clips still exist under
-  // public/voice/{id}/ so no regeneration is needed.
-  // {
-  //   id: "aria",
-  //   name: "Aria",
-  //   description: "US English · calm, neutral",
-  //   sourceVoice: "en-US-AriaNeural",
-  // },
-  // {
-  //   id: "jenny",
-  //   name: "Jenny",
-  //   description: "US English · warm, friendly",
-  //   sourceVoice: "en-US-JennyNeural",
-  // },
-  // {
-  //   id: "guy",
-  //   name: "Guy",
-  //   description: "US English · male, steady",
-  //   sourceVoice: "en-US-GuyNeural",
-  // },
-  // {
-  //   id: "libby",
-  //   name: "Libby",
-  //   description: "British English · soft",
-  //   sourceVoice: "en-GB-LibbyNeural",
-  // },
-  // {
-  //   id: "thomas",
-  //   name: "Thomas",
-  //   description: "British English · deep, male",
-  //   sourceVoice: "en-GB-ThomasNeural",
-  // },
   // Oliver and Bill temporarily disabled — clips remain under
   // public/voice/{id}/ so un-commenting brings them back without regen.
   // {
