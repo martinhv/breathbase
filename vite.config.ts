@@ -7,10 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // "prompt" so a new build doesn't silently swap the SW under a user
-      // mid-session. The ReloadPrompt component (src/components/) shows a
-      // small banner and the user taps to apply the update.
-      registerType: "prompt",
+      // "autoUpdate" so new builds silently activate without showing a
+      // banner. The mid-session swap risk is small (the SW activates on
+      // controllerchange / navigation, not in the middle of a tick).
+      registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icon-512.svg"],
       workbox: {
         // Voice mp3s are *not* precached — that would force every user to

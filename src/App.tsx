@@ -17,7 +17,6 @@ import { applyTheme, subscribeSystemTheme } from "@/lib/theme";
 import { cancelReminder, scheduleReminder } from "@/lib/notifications";
 import { initAnalytics, trackPageView } from "@/lib/analytics";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
-import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { Home } from "@/pages/Home";
 import { Category } from "@/pages/Category";
 import { Session } from "@/pages/Session";
@@ -151,7 +150,6 @@ export default function App() {
           <Route path="*" element={<AuthGate />} />
         </Routes>
       </BrowserRouter>
-      <ReloadPrompt />
     </AuthProvider>
   );
 }
