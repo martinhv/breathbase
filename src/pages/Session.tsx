@@ -441,7 +441,7 @@ function SessionInner({ technique }: { technique: Technique }) {
               </p>
             </div>
           )}
-          {programDay && hasTutorial(technique.id) && (
+          {hasTutorial(technique.id) && (
             <div className="w-full max-w-md">
               <TutorialDisclosure techniqueId={technique.id} />
             </div>
