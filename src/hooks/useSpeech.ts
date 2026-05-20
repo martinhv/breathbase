@@ -36,6 +36,10 @@ const PROMPT_SLUGS: Record<string, string> = {
   // Played once when the ready countdown starts, to set the tone of the
   // session. Not a breath phase prompt — fired from Session.tsx.
   "Get ready": "get-ready",
+  // Played once during the settling stage at session end. Slug name is
+  // semantic; the actual narration is "Rest here for a moment. Notice how
+  // you feel." (see scripts/generate-voice.sh).
+  "Session end": "session-end",
 };
 
 const PREVIEW_SLUG = "preview";

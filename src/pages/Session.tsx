@@ -33,7 +33,17 @@ type Stage =
   | "safety" // safety modal (only if technique has safetyNotes)
   | "intro" // pre-session lesson card (only when launched from Foundations program)
   | "active" // ready countdown + session
+  | "settling" // post-session integration moment (bell + slow fade + voice line)
   | "complete"; // "Session complete" summary
+
+/** Duration of the settling stage before auto-advancing to complete. */
+const SETTLING_DURATION_MS = 15_000;
+/** Delay between bell + fade start and the spoken closing line, so the bell
+ *  has space to ring out before the voice arrives. */
+const SETTLING_VOICE_DELAY_MS = 1_800;
+/** Music fade-out ramp on settling start — longer than the previous abrupt
+ *  fade so the bed dies down across the whole integration window. */
+const SETTLING_MUSIC_FADE_S = 6;
 
 function formatTime(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -155,15 +165,17 @@ function SessionInner({ technique }: { technique: Technique }) {
     onPhaseEnter,
     onStartRunning,
     onComplete: () => {
-      audio.fadeOutMusic(2);
-      cancelSpeech();
+      // Don't fade music or cancel speech here — the settling stage owns
+      // the closing audio (slower fade + closing bell + spoken line). Just
+      // mark the body-level "you're done with breathing" cue and advance.
       vibrate([80, 60, 80]);
-      setStage("complete");
+      setStage("settling");
     },
   });
 
-  // Keep the screen on while the user is actively breathing along.
-  useWakeLock(stage === "active");
+  // Keep the screen on through both active breathing and the settling moment
+  // — letting the screen sleep mid-settle would feel abrupt.
+  useWakeLock(stage === "active" || stage === "settling");
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
@@ -193,10 +205,33 @@ function SessionInner({ technique }: { technique: Technique }) {
     }
   }, [session.status, speak]);
 
-  // When the user enters complete stage, write a history entry.
+  // Settling stage: a 15s integration moment between the last breath phase
+  // and the complete summary. Fires the closing bell immediately so it rings
+  // out into the still-loud bus, starts a long music fade, schedules the
+  // spoken closing line ~2s in, and auto-advances to complete at 15s.
+  // The Continue button (in the settling UI) shortcuts the timer.
+  useEffect(() => {
+    if (stage !== "settling") return;
+    audio.playClosingBell();
+    audio.fadeOutMusic(SETTLING_MUSIC_FADE_S);
+    const voiceTimer = window.setTimeout(() => {
+      speak("Session end");
+    }, SETTLING_VOICE_DELAY_MS);
+    const advanceTimer = window.setTimeout(() => {
+      setStage("complete");
+    }, SETTLING_DURATION_MS);
+    return () => {
+      window.clearTimeout(voiceTimer);
+      window.clearTimeout(advanceTimer);
+    };
+  }, [stage, audio, speak]);
+
+  // When the breath session ends, write a history entry. We fire on the
+  // settling→ or →complete edge (whichever comes first) so the session
+  // counts even if the user closes the tab mid-settle.
   const historyWritten = useRef(false);
   useEffect(() => {
-    if (stage !== "complete") return;
+    if (stage !== "settling" && stage !== "complete") return;
     if (historyWritten.current || !technique || !user) return;
     historyWritten.current = true;
     track("session_complete", {
@@ -341,6 +376,41 @@ function SessionInner({ technique }: { technique: Technique }) {
           className="mt-3 w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
           Begin · {programDay.durationMin}m
+        </button>
+      </div>
+    );
+  }
+
+  // ── SETTLING ────────────────────────────────────────────────────────────
+  // Soft "integration" moment: dim glow, closing line on screen, Continue
+  // shortcut. Audio side effects (bell, fade, spoken line) live in the
+  // settling-stage useEffect above; this block is purely presentational.
+  if (stage === "settling") {
+    return (
+      <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-7">
+          <div
+            aria-hidden
+            className="relative w-32 h-32 flex items-center justify-center"
+          >
+            <div className="absolute inset-0 rounded-full bg-teal-400/15 motion-safe:animate-pulse" />
+            <div className="absolute inset-4 rounded-full bg-teal-400/25 motion-safe:animate-pulse [animation-delay:0.6s]" />
+            <div className="absolute inset-10 rounded-full bg-teal-400/55" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-light text-slate-900 dark:text-slate-100">
+              A moment to settle
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
+              Rest here for a moment. Notice how you feel.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setStage("complete")}
+          className="px-5 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
+        >
+          Continue
         </button>
       </div>
     );

@@ -988,6 +988,18 @@ class AudioEngineImpl {
   }
 
   /**
+   * Fire the closing bell — same FM bell used at progression-wrap moments,
+   * but at a slightly higher velocity to mark the end of the session. Routes
+   * through the music bus, so callers should trigger this BEFORE the music
+   * fade so the bell rings out as the bed dies down. No-op when music is
+   * disabled or the graph isn't built.
+   */
+  playClosingBell(): void {
+    if (!this.settings.musicEnabled) return;
+    this.triggerBell(0.55);
+  }
+
+  /**
    * Plays an unconditional chime + chord so Settings can verify audio
    * routing. Ignores musicEnabled/chimesEnabled flags.
    */
