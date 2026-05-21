@@ -117,9 +117,9 @@ export function Login() {
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
       <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 pt-8">
-        <div className="text-6xl">🌬️</div>
+        <img src="/icon-512.svg" alt="" aria-hidden className="w-20 h-20 rounded-2xl" />
         <div>
-          <h1 className="text-3xl font-light tracking-tight">BreathBase</h1>
+          <h1 className="text-3xl font-light tracking-tight">Sough</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 max-w-xs">
             Foundational breathwork, grounded in science.
           </p>
