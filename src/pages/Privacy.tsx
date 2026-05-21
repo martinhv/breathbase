@@ -52,7 +52,7 @@ export function Privacy() {
           </h2>
 
           <p className="mb-3">
-            BreathBase processes the minimum data needed to give you a
+            Sough processes the minimum data needed to give you a
             personalised, multi-device experience.
           </p>
 
@@ -236,7 +236,7 @@ export function Privacy() {
             8. Health-related content
           </h2>
           <p>
-            BreathBase is a wellness tool, not a medical device. We do not
+            Sough is a wellness tool, not a medical device. We do not
             ask for diagnoses, conditions, or any data that would fall
             under Art. 9 GDPR (special categories). Optional mood
             check-ins are general well-being signals stored only under

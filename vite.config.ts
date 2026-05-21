@@ -52,8 +52,8 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: "BreathBase",
-        short_name: "BreathBase",
+        name: "Sough",
+        short_name: "Sough",
         description: "Foundational breathwork, grounded in science.",
         theme_color: "#0f172a",
         background_color: "#0b1120",

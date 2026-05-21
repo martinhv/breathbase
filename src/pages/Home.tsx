@@ -152,7 +152,7 @@ export function Home() {
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-5 pb-6 max-w-md mx-auto">
       <header className="pt-4 pb-6">
-        <h1 className="text-3xl font-light tracking-tight">BreathBase</h1>
+        <h1 className="text-3xl font-light tracking-tight">Sough</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
           Foundational breathwork, grounded in science.
         </p>

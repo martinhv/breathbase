@@ -138,7 +138,7 @@ export const sendReminders = onSchedule(
           fcmOptions: { link: "/" },
           notification: {
             icon: "/icon-512.svg",
-            tag: "breathbase-reminder",
+            tag: "sough-reminder",
           },
         },
       });

@@ -117,11 +117,11 @@ const sessionsCol = (uid: string) => collection(db, "users", uid, "sessions");
 // localStorage adapter (local mode)
 // ---------------------------------------------------------------------------
 //
-// Keys: `breathbase:{uid}:settings` and `breathbase:{uid}:sessions`. Sessions
+// Keys: `sough:{uid}:settings` and `sough:{uid}:sessions`. Sessions
 // are stored as a single JSON array (newest first) — no need for the document
 // indexing Firestore provides at this scale.
 
-const LS_NS = "breathbase";
+const LS_NS = "sough";
 const lsKey = (uid: string, kind: "settings" | "sessions") =>
   `${LS_NS}:${uid}:${kind}`;
 

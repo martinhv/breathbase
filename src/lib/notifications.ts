@@ -4,7 +4,7 @@
 // Daily practice reminders.
 //
 // Honest scope: this module schedules a one-shot setTimeout that fires while
-// the BreathBase tab is alive. If the user closes the tab, no notification.
+// the Sough tab is alive. If the user closes the tab, no notification.
 // True background push (when the app is closed) requires Web Push + a server
 // to schedule sends — see the README's "Future: push" section, or wire up
 // FCM via the existing Firebase project.
@@ -17,7 +17,7 @@
 
 let activeTimer: number | null = null;
 
-export const REMINDER_TAG = "breathbase-reminder";
+export const REMINDER_TAG = "sough-reminder";
 
 export function isSupported(): boolean {
   return typeof window !== "undefined" && "Notification" in window;

@@ -231,7 +231,7 @@ export function Settings() {
       const a = document.createElement("a");
       const stamp = new Date().toISOString().slice(0, 10);
       a.href = url;
-      a.download = `breathbase-export-${stamp}.json`;
+      a.download = `sough-export-${stamp}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -593,10 +593,10 @@ export function Settings() {
               {!notificationsSupported()
                 ? "Notifications aren't available in this browser."
                 : notifPermission === "denied"
-                  ? "Notifications are blocked. Enable them for breathbase.app in your browser settings, then re-enable here."
+                  ? "Notifications are blocked. Enable them for sough.app in your browser settings, then re-enable here."
                   : isPushAvailable()
-                    ? "Reminders are delivered via Firebase Cloud Messaging — they fire even when BreathBase is closed."
-                    : "Reminders fire only while BreathBase is open in a tab. Set VITE_FIREBASE_VAPID_KEY and deploy the reminder Cloud Function for background push (see README)."}
+                    ? "Reminders are delivered via Firebase Cloud Messaging — they fire even when Sough is closed."
+                    : "Reminders fire only while Sough is open in a tab. Set VITE_FIREBASE_VAPID_KEY and deploy the reminder Cloud Function for background push (see README)."}
             </p>
           </div>
         </Collapse>
@@ -666,7 +666,7 @@ export function Settings() {
           >
             <div className="divide-y divide-slate-900/5 dark:divide-white/5">
               <Toggle
-                label="Help improve BreathBase (anonymous usage)"
+                label="Help improve Sough (anonymous usage)"
                 checked={settings.analyticsEnabled}
                 onChange={(v) => update({ analyticsEnabled: v })}
               />

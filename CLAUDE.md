@@ -21,15 +21,15 @@ There are no automated tests. Type-checking (`npm run lint`) is the primary corr
 
 **Local env:** for production-like running, copy `.env.example` → `.env.local` and fill in the six `VITE_FIREBASE_*` values from your Firebase web-app config. README has the full Firebase setup walkthrough (enable Google provider, Firestore rules).
 
-**Local mode (build-time):** if `VITE_LOCAL_MODE=true` is set, **or** the `VITE_FIREBASE_*` env vars are all empty, the app skips Firebase entirely. A synthetic "local user" is signed in automatically (no Login screen) and settings/sessions persist to `window.localStorage` under `breathbase:local-user:*` keys. Useful for `npm run dev` on a fresh clone with zero setup, or offline-only testing. See `src/lib/firebase.ts` for the `localMode` flag.
+**Local mode (build-time):** if `VITE_LOCAL_MODE=true` is set, **or** the `VITE_FIREBASE_*` env vars are all empty, the app skips Firebase entirely. A synthetic "local user" is signed in automatically (no Login screen) and settings/sessions persist to `window.localStorage` under `sough:local-user:*` keys. Useful for `npm run dev` on a fresh clone with zero setup, or offline-only testing. See `src/lib/firebase.ts` for the `localMode` flag.
 
-**Guest mode (runtime):** when Firebase IS configured, the Login screen leads with a "Start without an account" CTA. Clicking it sets `localStorage["breathbase:guestMode"] = "true"` and signs the same synthetic `local-user` in for this device. Storage routing is by **uid** (`isLocalUid(uid)` in `firebase.ts`), so guests and build-time-local users share the same localStorage paths. When a guest later signs in to Firebase, `migrateGuestData(toUid)` in `storage.ts` copies their local settings (only if the target account is brand-new) and all sessions (always additive) into Firestore, then clears the local copy. `useAuth()` exposes `isGuest` and `canRegister` so the UI can offer the upgrade CTA only when there's actually a Firebase backend to upgrade *to*.
+**Guest mode (runtime):** when Firebase IS configured, the Login screen leads with a "Start without an account" CTA. Clicking it sets `localStorage["sough:guestMode"] = "true"` and signs the same synthetic `local-user` in for this device. Storage routing is by **uid** (`isLocalUid(uid)` in `firebase.ts`), so guests and build-time-local users share the same localStorage paths. When a guest later signs in to Firebase, `migrateGuestData(toUid)` in `storage.ts` copies their local settings (only if the target account is brand-new) and all sessions (always additive) into Firestore, then clears the local copy. `useAuth()` exposes `isGuest` and `canRegister` so the UI can offer the upgrade CTA only when there's actually a Firebase backend to upgrade *to*.
 
 **Push reminders (optional):** if `VITE_FIREBASE_VAPID_KEY` is set, daily reminders are delivered via Firebase Cloud Messaging (background-capable) instead of the client-side `setTimeout`. Client wiring in `src/lib/push.ts`, scheduled Cloud Function in `functions/src/index.ts`, FCM service worker in `public/firebase-messaging-sw.js` (rewritten at build time by `scripts/build-fcm-sw.mjs` to inline Firebase config). See README "Push reminders" for the deploy steps.
 
 ## Architecture
 
-BreathBase is a mobile-first PWA (React 18 + TypeScript + Vite). Auth required (Google sign-in); per-user data lives in Firestore.
+Sough is a mobile-first PWA (React 18 + TypeScript + Vite). Auth required (Google sign-in); per-user data lives in Firestore.
 
 **Path alias:** `@/` resolves to `src/`.
 

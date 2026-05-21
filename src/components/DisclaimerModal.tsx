@@ -45,7 +45,7 @@ export function DisclaimerModal({
         </h2>
         <div className="space-y-3 text-slate-700 dark:text-slate-300 text-sm">
           <p>
-            <strong>BreathBase is not medical advice.</strong> It is an
+            <strong>Sough is not medical advice.</strong> It is an
             educational tool to support a personal breathwork practice.
           </p>
           <p>
@@ -75,7 +75,7 @@ export function DisclaimerModal({
             />
             <span className="text-sm text-slate-800 dark:text-slate-200 leading-snug">
               I have read and understood the safety information above. I
-              accept that BreathBase is an educational tool, not medical
+              accept that Sough is an educational tool, not medical
               advice, and I practice at my own risk.
             </span>
           </label>

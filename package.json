@@ -1,9 +1,9 @@
 {
-  "name": "breathbase",
+  "name": "sough",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "BreathBase — Foundational breathwork, grounded in science.",
+  "description": "Sough — Foundational breathwork, grounded in science.",
   "author": {
     "name": "Martin Hirschvogel",
     "url": "https://github.com/martinhv"
@@ -11,7 +11,7 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/martinhv/breathbase.git"
+    "url": "https://github.com/martinhv/sough.git"
   },
   "scripts": {
     "dev": "vite",

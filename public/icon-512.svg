@@ -1,17 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
-      <stop offset="0%" stop-color="#1e1b4b" />
+    <radialGradient id="bg" cx="50%" cy="35%" r="85%">
+      <stop offset="0%" stop-color="#1e3a5f" />
+      <stop offset="55%" stop-color="#0f1e3a" />
       <stop offset="100%" stop-color="#070b14" />
     </radialGradient>
-    <radialGradient id="orb" cx="35%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="#bae6fd" />
-      <stop offset="50%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#1e3a8a" />
-    </radialGradient>
+    <linearGradient id="tree" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#134e4a" />
+      <stop offset="100%" stop-color="#042f2e" />
+    </linearGradient>
   </defs>
+
   <rect width="512" height="512" fill="url(#bg)" />
-  <circle cx="256" cy="256" r="170" fill="url(#orb)" />
-  <circle cx="256" cy="256" r="170" fill="none" stroke="#5eead4" stroke-opacity="0.5" stroke-width="6" />
-  <circle cx="256" cy="256" r="220" fill="none" stroke="#5eead4" stroke-opacity="0.15" stroke-width="2" />
+
+  <!-- Far wind streamers behind the trees -->
+  <g stroke="#5eead4" fill="none" stroke-linecap="round">
+    <path d="M 60 175 Q 200 145, 280 175 T 460 195" stroke-width="5" opacity="0.30" />
+    <path d="M 50 250 Q 200 220, 290 255 T 470 265" stroke-width="6" opacity="0.22" />
+  </g>
+
+  <!-- Conifer silhouettes -->
+  <g fill="url(#tree)" stroke="#0a1f1d" stroke-width="1.5" stroke-linejoin="round">
+    <path d="M 140 385 L 180 245 L 220 385 Z" />
+    <path d="M 200 405 L 256 195 L 312 405 Z" />
+    <path d="M 295 390 L 340 230 L 385 390 Z" />
+  </g>
+
+  <!-- Near wind streamers threading through the trunks -->
+  <g stroke="#67e8f9" fill="none" stroke-linecap="round">
+    <path d="M 70 310 Q 200 285, 290 320 T 460 335" stroke-width="6" opacity="0.55" />
+    <path d="M 90 370 Q 230 350, 320 375 T 470 380" stroke-width="5" opacity="0.40" />
+  </g>
+
+  <!-- Subtle outer ring carried over from the previous identity -->
+  <circle cx="256" cy="256" r="230" fill="none" stroke="#5eead4" stroke-opacity="0.10" stroke-width="2" />
 </svg>

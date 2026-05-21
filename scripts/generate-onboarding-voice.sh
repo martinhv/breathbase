@@ -52,8 +52,13 @@ declare -A VOICES=(
 SLUGS=(welcome help start-small five-day)
 
 declare -A NARRATIONS=(
-  [welcome]="Welcome to BreathBase. Breathwork is one of the simplest, most powerful tools we have to influence our nervous system — and modern research is catching up with what practitioners have known for centuries. Let's get you started."
-  [help]="BreathBase can help with many things. Calm yourself when stress builds. Settle into sleep when your mind won't quiet down. Sharpen your focus before something that matters. Or wake up your body when you're feeling flat. Each technique targets a specific response in your nervous system."
+  # Narrations are written with the canonical brand "Sough", but ElevenLabs
+  # defaults to /saʊ/ ("sow") for that spelling. We rewrite "Sough" → "Suff"
+  # just before synthesis (see the loop below) to force /sʌf/. The source of
+  # truth stays "Sough" so a future model with better lexicon coverage — or a
+  # pronunciation-dictionary entry — can drop the substitution.
+  [welcome]="Welcome to Sough. Breathwork is one of the simplest, most powerful tools we have to influence our nervous system — and modern research is catching up with what practitioners have known for centuries. Let's get you started."
+  [help]="Sough can help with many things. Calm yourself when stress builds. Settle into sleep when your mind won't quiet down. Sharpen your focus before something that matters. Or wake up your body when you're feeling flat. Each technique targets a specific response in your nervous system."
   [start-small]="Five minutes a day is enough. Consistency matters far more than duration — a short practice every morning will do more than an hour once a week."
   [five-day]="We've laid out a five-day Foundations program — one practice per day, each with a short lesson up front, building from simple to more advanced. It's there on the home screen whenever you're ready to begin."
 )
@@ -113,6 +118,9 @@ for voice in "${TARGET_VOICES[@]}"; do
 
   for slug in "${TARGET_SLUGS[@]}"; do
     text="${NARRATIONS[$slug]}"
+    # Pronunciation respell: see the NARRATIONS comment. The on-disk strings
+    # keep the canonical brand; only the bytes sent to ElevenLabs are rewritten.
+    text="${text//Sough/Suff}"
     out_file="$out_dir/onboarding-$slug.mp3"
     raw_file="$TMP_DIR/$voice-$slug-raw.mp3"
     echo "  $slug (${#text} chars)"

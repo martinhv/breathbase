@@ -17,7 +17,7 @@ import { track } from "@/lib/analytics";
 const SLIDES = [
   {
     icon: "🌬️",
-    title: "Welcome to BreathBase",
+    title: "Welcome to Sough",
     body: "Breathwork rooted in modern science.",
     narration: "welcome",
   },

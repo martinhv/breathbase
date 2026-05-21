@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#0b1120" />
     <meta
       name="description"
-      content="BreathBase — Foundational breathwork, grounded in science."
+      content="Sough — Foundational breathwork, grounded in science."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,14 +18,14 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
-    <title>BreathBase</title>
+    <title>Sough</title>
     <script>
       // Apply theme before React paints so we never flash the wrong palette.
       // Mirrors src/lib/theme.ts (see applyTheme there); we duplicate the
       // logic in HTML on purpose so the very first frame is correct.
       (function () {
         try {
-          var raw = localStorage.getItem("bb.theme");
+          var raw = localStorage.getItem("sough:theme");
           var theme = raw === "light" || raw === "dark" || raw === "auto" ? raw : "auto";
           var dark =
             theme === "dark" ||

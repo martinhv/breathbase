@@ -91,7 +91,7 @@ const LOCAL_USER = {
 
 // localStorage flag remembering that the user picked "continue without an
 // account". Survives reloads so they don't see the Login screen every time.
-const GUEST_FLAG_KEY = "breathbase:guestMode";
+const GUEST_FLAG_KEY = "sough:guestMode";
 const readGuestFlag = (): boolean => {
   if (typeof window === "undefined") return false;
   try {

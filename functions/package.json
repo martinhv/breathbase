@@ -1,8 +1,8 @@
 {
-  "name": "breathbase-functions",
+  "name": "sough-functions",
   "private": true,
   "version": "0.1.0",
-  "description": "Scheduled Cloud Functions for BreathBase — daily reminder push notifications.",
+  "description": "Scheduled Cloud Functions for Sough — daily reminder push notifications.",
   "main": "lib/index.js",
   "engines": {
     "node": "20"

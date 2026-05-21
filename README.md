@@ -1,8 +1,8 @@
-# BreathBase
+# Sough
 
 **Foundational breathwork, grounded in science.**
 
-BreathBase is a mobile-first PWA for guided breathwork. It covers the
+Sough is a mobile-first PWA for guided breathwork. It covers the
 *Foundational* tier of practice — awareness, relaxation, and basic breath
 control — with nine evidence-based techniques across four states:
 downregulate, upregulate, balance, and focus.
@@ -35,7 +35,7 @@ Open the URL Vite prints (typically `http://localhost:5173`). With no
 `.env.local` present, the app auto-detects that Firebase is unconfigured
 and runs in **local mode**: a synthetic "local user" is signed in
 automatically (no login screen) and all settings + session history persist
-to `window.localStorage` under `breathbase:local-user:*` keys.
+to `window.localStorage` under `sough:local-user:*` keys.
 
 You can also force local mode explicitly by setting `VITE_LOCAL_MODE=true`
 in `.env.local` — useful if you want to keep Firebase credentials handy
@@ -74,7 +74,7 @@ npm run dev
 
 ### Optional — push reminders that fire when the app is closed
 
-Daily reminders work out of the box, but only while a BreathBase tab is open.
+Daily reminders work out of the box, but only while a Sough tab is open.
 To deliver reminders via background push (the way Calm / Headspace do it),
 wire up Firebase Cloud Messaging + the scheduled Cloud Function in
 `functions/`:
@@ -107,7 +107,7 @@ wire up Firebase Cloud Messaging + the scheduled Cloud Function in
 When the VAPID key is set, the Settings page automatically registers an FCM
 token whenever a user enables reminders; the explainer line updates to
 *"Reminders are delivered via Firebase Cloud Messaging — they fire even
-when BreathBase is closed."* Without the VAPID key it falls back to the
+when Sough is closed."* Without the VAPID key it falls back to the
 client-side setTimeout that only fires with a tab open.
 
 ### Other commands
@@ -128,22 +128,22 @@ Android Chrome.
 ## Deploying behind a separate Caddy VM
 
 The repo ships a `Dockerfile`, `nginx.conf`, and `docker-compose.yml` so
-BreathBase can run on its own VM and sit behind a dedicated edge VM that
+Sough can run on its own VM and sit behind a dedicated edge VM that
 runs Caddy (TLS termination, HTTP→HTTPS, certs). Both VMs live on the
 same internal network; only the Caddy VM exposes 80/443 to the outside.
 
 ```
-   internet ──443──▶  Caddy VM  ──8080──▶  BreathBase VM (nginx :8080)
+   internet ──443──▶  Caddy VM  ──8080──▶  Sough VM (nginx :8080)
                        (TLS)              (Docker container)
 ```
 
-### On the BreathBase VM
+### On the Sough VM
 
 Prerequisites: Docker Engine + the compose plugin.
 
 ```bash
-git clone https://github.com/martinhv/breathbase.git
-cd breathbase
+git clone https://github.com/martinhv/sough.git
+cd sough
 cp deploy/.env.production.example .env
 # fill in your VITE_FIREBASE_* values (they're baked in at build time)
 
@@ -160,10 +160,10 @@ own `HEALTHCHECK` both poll it.
 ### On the Caddy VM
 
 Drop this site block into the Caddyfile (substitute your domain and the
-BreathBase VM's address):
+Sough VM's address):
 
 ```caddyfile
-breathbase.example.com {
+sough.example.com {
     encode zstd gzip
     reverse_proxy 10.0.0.42:8080 {
         header_up X-Real-IP        {remote_host}
@@ -183,7 +183,7 @@ Google sign-in is allowed there.
 ### Updating
 
 ```bash
-cd ~/breathbase
+cd ~/sough
 git pull
 docker compose up -d --build
 ```
@@ -208,7 +208,7 @@ in the Caddyfile.
 
 ## Analytics (optional, self-hosted)
 
-BreathBase has no analytics out of the box. Setting both
+Sough has no analytics out of the box. Setting both
 `VITE_UMAMI_WEBSITE_ID` and `VITE_UMAMI_SCRIPT_URL` at build time wires
 the app to a self-hosted [Umami](https://umami.is) instance — cookieless,
 no third-party trackers, all data stays under your control.
@@ -419,7 +419,7 @@ Two delivery paths, picked automatically:
 - **Client-side fallback (`lib/notifications.ts`)** — when push isn't
   configured (no VAPID key, local mode, denied permission), `App.tsx`
   schedules a self-rearming `setTimeout` that fires `new Notification(...)`
-  at the chosen time. Only fires while a BreathBase tab is alive.
+  at the chosen time. Only fires while a Sough tab is alive.
 
 ### Local mode — `lib/firebase.ts`
 
@@ -493,7 +493,7 @@ and are surfaced in-app under each technique's "More" button.
 
 ## Roadmap
 
-BreathBase ships the **Foundational** tier today: techniques that are
+Sough ships the **Foundational** tier today: techniques that are
 safe to learn unsupervised and that build the skills of awareness,
 relaxation, and basic breath control. Future tiers will introduce more
 advanced practices that require firmer prerequisites and additional
@@ -519,7 +519,7 @@ Smaller in-progress items, in roughly the order they'd be useful:
 
 ## Disclaimer
 
-BreathBase is an educational tool and **not medical advice**. The
+Sough is an educational tool and **not medical advice**. The
 techniques described here are widely taught, but individual responses
 vary. If you have a medical condition or are pregnant, please consult a
 physician before practicing. Stop immediately if you feel dizzy or
@@ -532,7 +532,7 @@ or while operating vehicles or machinery.
 
 Copyright © 2026 [Martin Hirschvogel](https://github.com/martinhv).
 
-BreathBase is licensed under the [GNU Affero General Public License
+Sough is licensed under the [GNU Affero General Public License
 v3.0 or later](LICENSE) (AGPL-3.0-or-later).
 
 In plain English:
@@ -547,7 +547,7 @@ In plain English:
   user of that service. There is no "use it internally and keep your
   changes secret" loophole for network use.
 
-This is intentional. BreathBase is meant to be a public, auditable
+This is intentional. Sough is meant to be a public, auditable
 educational tool — not a free starter kit for someone to wrap in a
 paywall. Self-hosting is welcome and encouraged; running a closed
 commercial fork is not.

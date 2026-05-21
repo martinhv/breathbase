@@ -34,11 +34,11 @@ if (
   firebase.initializeApp(firebaseConfig);
   const messaging = firebase.messaging();
   messaging.onBackgroundMessage((payload) => {
-    const title = payload.notification?.title || "BreathBase";
+    const title = payload.notification?.title || "Sough";
     const options = {
       body: payload.notification?.body || "Time to practice.",
       icon: "/icon-512.svg",
-      tag: "breathbase-reminder",
+      tag: "sough-reminder",
     };
     self.registration.showNotification(title, options);
   });

@@ -8,7 +8,7 @@ import type { Theme } from "./storage";
 // already in the right theme; this module's applyTheme is called by React
 // once settings are loaded from Firestore and may switch themes again.
 
-const STORAGE_KEY = "bb.theme";
+const STORAGE_KEY = "sough:theme";
 
 export function isDarkMode(theme: Theme): boolean {
   if (theme === "dark") return true;

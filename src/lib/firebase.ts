@@ -66,7 +66,7 @@ let _provider: GoogleAuthProvider | undefined;
 if (localMode) {
   // eslint-disable-next-line no-console
   console.info(
-    "[breathbase] Running in local mode — Firebase disabled, data persists to localStorage.",
+    "[sough] Running in local mode — Firebase disabled, data persists to localStorage.",
   );
 } else {
   const missing = Object.entries(config)
