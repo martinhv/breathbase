@@ -10,7 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID: string;
   readonly VITE_FIREBASE_APP_ID: string;
 
-  // Legal / Impressum / GDPR contact info. Filled in at build time from
+  // Legal / Imprint / GDPR contact info. Filled in at build time from
   // the build environment (.env / .env.local — both gitignored). Pages
   // render placeholder text when unset.
   readonly VITE_LEGAL_COMPANY?: string;

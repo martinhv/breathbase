@@ -10,6 +10,7 @@ import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DEFAULT_VOICE_PROFILE } from "@/lib/voiceProfiles";
 import { enrollState } from "@/lib/program";
 import { track } from "@/lib/analytics";
+import { SoughMark } from "@/components/SoughMark";
 
 // Narration slugs match generate-onboarding-voice.sh. Files live at
 // public/voice/{DEFAULT_VOICE_PROFILE}/onboarding-{slug}.mp3 — onboarding is
@@ -184,7 +185,11 @@ export function Onboarding() {
               transition={{ duration: 0.35, ease: "easeOut" }}
               className="flex flex-col items-center gap-5"
             >
-              <div className="text-6xl">{SLIDES[i].icon}</div>
+              {i === 0 ? (
+                <SoughMark className="w-28 h-28" />
+              ) : (
+                <div className="text-6xl">{SLIDES[i].icon}</div>
+              )}
               <h1 className={`text-3xl font-light ${hasVideoBg ? "text-white" : "dark:text-slate-100"}`}>
                 {SLIDES[i].title}
               </h1>

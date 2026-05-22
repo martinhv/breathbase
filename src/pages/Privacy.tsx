@@ -246,8 +246,8 @@ export function Privacy() {
 
         <p className="text-xs text-slate-500 dark:text-slate-400 pt-2">
           Last updated: 18 May 2026. See also:{" "}
-          <Link to="/impressum" className="underline-offset-2 hover:underline">
-            Impressum
+          <Link to="/imprint" className="underline-offset-2 hover:underline">
+            Imprint
           </Link>
         </p>
       </section>

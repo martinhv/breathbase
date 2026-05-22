@@ -4,7 +4,7 @@
 import { Link } from "react-router-dom";
 import { LEGAL } from "@/lib/legal";
 
-export function Impressum() {
+export function Imprint() {
   return (
     <div className="min-h-full safe-top safe-bottom px-5 pb-8 max-w-md mx-auto">
       <header className="pt-4 pb-5 flex items-center gap-3">
@@ -16,7 +16,7 @@ export function Impressum() {
           ←
         </Link>
         <h1 className="text-xl font-light text-slate-900 dark:text-slate-100">
-          Impressum
+          Imprint
         </h1>
       </header>
 

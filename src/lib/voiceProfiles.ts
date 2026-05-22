@@ -69,7 +69,15 @@ export const VOICE_PROFILES: VoiceProfile[] = [
   },
 ];
 
+// Used for app narration (onboarding slides, technique tutorials, lesson
+// audio) and as the fallback when a saved voice ID is unknown. Theo has the
+// full clip set; other profiles only cover the in-session prompts.
 export const DEFAULT_VOICE_PROFILE = "theo";
+
+// Initial value for `settings.voiceProfile` — the voice the user hears
+// *during exercises* (breathe-in, breathe-out, count clips) before they pick
+// one in Settings.
+export const DEFAULT_EXERCISE_VOICE_PROFILE = "christopher";
 
 export const findVoiceProfile = (id: string): VoiceProfile =>
   VOICE_PROFILES.find((v) => v.id === id) ??

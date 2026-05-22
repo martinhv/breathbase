@@ -746,8 +746,8 @@ export function Settings() {
           {LICENSE_NAME}
         </a>
         {" · "}
-        <Link to="/impressum" className="underline-offset-2 hover:underline">
-          Impressum
+        <Link to="/imprint" className="underline-offset-2 hover:underline">
+          Imprint
         </Link>
         {" · "}
         <Link to="/privacy" className="underline-offset-2 hover:underline">

@@ -27,7 +27,7 @@ import { History } from "@/pages/History";
 import { Program } from "@/pages/Program";
 import { Theme } from "@/pages/Theme";
 import { Library } from "@/pages/Library";
-import { Impressum } from "@/pages/Impressum";
+import { Imprint } from "@/pages/Imprint";
 import { Privacy } from "@/pages/Privacy";
 
 function LoadingShell() {
@@ -144,8 +144,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Legal pages are reachable without sign-in so anonymous visitors
-              can find them — required for Impressum / GDPR. */}
-          <Route path="/impressum" element={<Impressum />} />
+              can find them — required for Imprint / GDPR. */}
+          <Route path="/imprint" element={<Imprint />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<AuthGate />} />
         </Routes>

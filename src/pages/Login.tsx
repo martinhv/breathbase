@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
 import { track } from "@/lib/analytics";
+import { SoughMark } from "@/components/SoughMark";
 
 type EmailMode = "signIn" | "signUp";
 
@@ -117,7 +118,7 @@ export function Login() {
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
       <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 pt-8">
-        <img src="/icon-512.svg" alt="" aria-hidden className="w-20 h-20 rounded-2xl" />
+        <SoughMark className="w-28 h-28" />
         <div>
           <h1 className="text-3xl font-light tracking-tight">Sough</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 max-w-xs">
@@ -277,8 +278,8 @@ export function Login() {
             {LICENSE_NAME}
           </a>
           {" · "}
-          <Link to="/impressum" className="underline-offset-2 hover:underline">
-            Impressum
+          <Link to="/imprint" className="underline-offset-2 hover:underline">
+            Imprint
           </Link>
           {" · "}
           <Link to="/privacy" className="underline-offset-2 hover:underline">

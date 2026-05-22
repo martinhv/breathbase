@@ -25,7 +25,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db, isLocalUid, LOCAL_UID } from "./firebase";
-import { DEFAULT_VOICE_PROFILE } from "./voiceProfiles";
+import { DEFAULT_EXERCISE_VOICE_PROFILE } from "./voiceProfiles";
 import { DEFAULT_PROGRAM_STATE, type ProgramState } from "./program";
 
 export type SessionEntry = {
@@ -85,7 +85,7 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   voiceEnabled: true,
-  voiceProfile: DEFAULT_VOICE_PROFILE,
+  voiceProfile: DEFAULT_EXERCISE_VOICE_PROFILE,
   countdownEnabled: true,
   musicEnabled: true,
   soundscape: "piano",
