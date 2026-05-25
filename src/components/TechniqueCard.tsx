@@ -10,12 +10,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { Technique } from "@/lib/techniques";
 import { useSettings } from "@/lib/settings";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { EMPTY_STATS, useHistory } from "@/lib/history";
 import { TUTORIALS, hasTutorial } from "@/lib/tutorials";
-import { DEFAULT_VOICE_PROFILE } from "@/lib/voiceProfiles";
+import { narrationVoiceForLanguage } from "@/lib/voiceProfiles";
 
 /**
  * A handful of round-number duration choices within the technique's allowed
@@ -33,7 +34,11 @@ function durationPresets(t: Technique): number[] {
     .slice(0, 5);
 }
 
-export function TechniqueCard({ t }: { t: Technique }) {
+export function TechniqueCard({ t: tech }: { t: Technique }) {
+  const { t, i18n } = useTranslation();
+  const narrationVoice = narrationVoiceForLanguage(
+    i18n.language.startsWith("de") ? "de" : "en",
+  );
   const { settings, update } = useSettings();
   const audio = useAudioEngine();
   const { summary } = useHistory();
@@ -44,14 +49,14 @@ export function TechniqueCard({ t }: { t: Technique }) {
   const tutorialAudioRef = useRef<HTMLAudioElement | null>(null);
   const navigate = useNavigate();
   const duration =
-    settings.durationOverrides[t.id] ?? t.defaultDurationMin;
-  const presets = durationPresets(t);
-  const stats = summary[t.id] ?? EMPTY_STATS;
-  const hasT = hasTutorial(t.id);
+    settings.durationOverrides[tech.id] ?? tech.defaultDurationMin;
+  const presets = durationPresets(tech);
+  const stats = summary[tech.id] ?? EMPTY_STATS;
+  const hasT = hasTutorial(tech.id);
 
   const setDuration = (mins: number) => {
     update({
-      durationOverrides: { ...settings.durationOverrides, [t.id]: mins },
+      durationOverrides: { ...settings.durationOverrides, [tech.id]: mins },
     });
   };
 
@@ -117,35 +122,45 @@ export function TechniqueCard({ t }: { t: Technique }) {
     }
   };
 
+  const shortDescription = t(`techniques.${tech.id}.shortDescription`, {
+    defaultValue: tech.shortDescription,
+  });
+  const scientificRationale = t(`techniques.${tech.id}.scientificRationale`, {
+    defaultValue: tech.scientificRationale,
+  });
+
   return (
     <article className="p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
       <header className="mb-2 flex items-baseline justify-between gap-3">
-        <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">{t.name}</h3>
+        <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">{tech.name}</h3>
         {stats.count > 0 && (
           <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 tabular-nums whitespace-nowrap">
-            {stats.count}× · {Math.round(stats.totalMs / 60_000)}m total
+            {t("techniqueCard.statsLine", {
+              count: stats.count,
+              minutes: Math.round(stats.totalMs / 60_000),
+            })}
           </div>
         )}
       </header>
       <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-        {t.shortDescription}
+        {shortDescription}
       </p>
       <p className="text-xs text-teal-300/80 mt-2 leading-relaxed italic">
-        {t.scientificRationale}
+        {scientificRationale}
       </p>
       {!hasT && expanded && (
         <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">
           <span className="uppercase tracking-widest text-slate-700 dark:text-slate-300">
-            Citation:{" "}
+            {t("techniqueCard.citation")}
           </span>
-          {t.citation}
+          {tech.citation}
         </p>
       )}
       {hasT && tutorialOpen && (
         <div className="mt-3 p-3 rounded-xl bg-slate-900/[0.06] dark:bg-white/5 border border-slate-900/5 dark:border-white/5 space-y-3">
           <audio
             ref={tutorialAudioRef}
-            src={`/voice/${DEFAULT_VOICE_PROFILE}/tutorial-${t.id}.mp3`}
+            src={`/voice/${narrationVoice}/tutorial-${tech.id}.mp3`}
             preload="auto"
             className="hidden"
           />
@@ -153,7 +168,7 @@ export function TechniqueCard({ t }: { t: Technique }) {
             <button
               type="button"
               onClick={togglePlayPause}
-              aria-label={tutorialPlaying ? "Pause tutorial" : "Play tutorial"}
+              aria-label={tutorialPlaying ? t("techniqueCard.pauseTutorial") : t("techniqueCard.playTutorial")}
               className="w-10 h-10 rounded-full bg-teal-400/90 text-ink-950 flex items-center justify-center hover:bg-teal-300 shrink-0"
             >
               {tutorialPlaying ? (
@@ -175,25 +190,27 @@ export function TechniqueCard({ t }: { t: Technique }) {
             </div>
           </div>
           <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed space-y-2">
-            {TUTORIALS[t.id].split("\n\n").map((para, idx) => (
-              <p key={idx}>{para}</p>
-            ))}
+            {t(`tutorials.${tech.id}`, { defaultValue: TUTORIALS[tech.id] })
+              .split("\n\n")
+              .map((para, idx) => (
+                <p key={idx}>{para}</p>
+              ))}
           </div>
           <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
             <span className="uppercase tracking-widest text-slate-700 dark:text-slate-300">
-              Citation:{" "}
+              {t("techniqueCard.citation")}
             </span>
-            {t.citation}
+            {tech.citation}
           </p>
         </div>
       )}
       <div
         className="mt-4 flex items-center gap-1.5 flex-wrap"
         role="radiogroup"
-        aria-label="Session length"
+        aria-label={t("techniqueCard.sessionLength")}
       >
         <span className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mr-1">
-          Duration
+          {t("techniqueCard.duration")}
         </span>
         {presets.map((mins) => {
           const active = duration === mins;
@@ -220,32 +237,25 @@ export function TechniqueCard({ t }: { t: Technique }) {
             onClick={toggleTutorial}
             className="px-3 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10 border border-slate-900/10 dark:border-white/10"
           >
-            {tutorialOpen ? "Close" : "Tutorial"}
+            {tutorialOpen ? t("techniqueCard.closeTutorial") : t("techniqueCard.tutorial")}
           </button>
         ) : (
           <button
             onClick={() => setExpanded((v) => !v)}
             className="px-3 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10 border border-slate-900/10 dark:border-white/10"
           >
-            {expanded ? "Less" : "More"}
+            {expanded ? t("techniqueCard.less") : t("techniqueCard.more")}
           </button>
         )}
         <button
           onClick={async () => {
-            // Pause tutorial before navigating so it doesn't bleed into Session.
             tutorialAudioRef.current?.pause();
-            // CRITICAL: unlock() (which calls Tone.start internally) must run
-            // inside a real user-gesture handler, not from a useEffect, or
-            // Chrome's autoplay policy keeps the AudioContext suspended.
-            // Doing it here ALSO builds the audio graph against a running
-            // context, so the singleton is fully ready by the time Session
-            // mounts and calls startMusic.
             await audio.unlock();
-            navigate(`/session/${t.id}`);
+            navigate(`/session/${tech.id}`);
           }}
           className="ml-auto px-5 py-2 rounded-xl bg-teal-400/90 text-ink-950 text-sm font-medium hover:bg-teal-300"
         >
-          Begin · {duration}m
+          {t("session.beginWithDuration", { mins: duration })}
         </button>
       </div>
     </article>

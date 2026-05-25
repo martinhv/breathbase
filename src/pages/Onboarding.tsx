@@ -3,46 +3,36 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettings } from "@/lib/settings";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
-import { DEFAULT_VOICE_PROFILE } from "@/lib/voiceProfiles";
+import { narrationVoiceForLanguage } from "@/lib/voiceProfiles";
 import { enrollState } from "@/lib/program";
 import { track } from "@/lib/analytics";
 import { SoughMark } from "@/components/SoughMark";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 // Narration slugs match generate-onboarding-voice.sh. Files live at
 // public/voice/{DEFAULT_VOICE_PROFILE}/onboarding-{slug}.mp3 — onboarding is
 // pinned to the default voice since the user hasn't picked one yet.
-const SLIDES = [
-  {
-    icon: "🌬️",
-    title: "Welcome to Sough",
-    body: "Breathwork rooted in modern science.",
-    narration: "welcome",
-  },
-  {
-    icon: "🧭",
-    title: "Many ways it helps",
-    body: "Calm stress. Sleep deeper. Sharpen focus. Find energy.",
-    narration: "help",
-  },
-  {
-    icon: "🌱",
-    title: "Start small",
-    body: "Five minutes a day. Consistency matters more than duration.",
-    narration: "start-small",
-  },
-  {
-    icon: "🗓️",
-    title: "A five-day start",
-    body: "We've laid out a five-day Foundations program — one practice per day, each with a short lesson. Pick it up on the home screen whenever you're ready.",
-    narration: "five-day",
-  },
-];
+const SLIDE_META = [
+  { icon: "🌬️", narration: "welcome" },
+  { icon: "🧭", narration: "help" },
+  { icon: "🌱", narration: "start-small" },
+  { icon: "🗓️", narration: "five-day" },
+] as const;
 
 export function Onboarding() {
+  const { t, i18n } = useTranslation();
+  const narrationVoice = narrationVoiceForLanguage(
+    i18n.language.startsWith("de") ? "de" : "en",
+  );
+  const slides = t("onboarding.slides", { returnObjects: true }) as Array<{
+    title: string;
+    body: string;
+  }>;
   const [i, setI] = useState(0);
   const [videoEnded, setVideoEnded] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -52,7 +42,7 @@ export function Onboarding() {
   const audio = useAudioEngine();
   const audioStarted = useRef(false);
   const narrationRef = useRef<HTMLAudioElement | null>(null);
-  const isLast = i === SLIDES.length - 1;
+  const isLast = i === SLIDE_META.length - 1;
   const hasVideoBg = i === 0;
 
   // Fire-and-forget audio unlock from the same task as the user gesture.
@@ -73,10 +63,10 @@ export function Onboarding() {
     if (!el) return;
     el.pause();
     if (!settings.voiceEnabled) return;
-    el.src = `/voice/${DEFAULT_VOICE_PROFILE}/onboarding-${SLIDES[i].narration}.mp3`;
+    el.src = `/voice/${narrationVoice}/onboarding-${SLIDE_META[i].narration}.mp3`;
     el.currentTime = 0;
     el.play().catch(() => { /* autoplay blocked — fall back to silent slide */ });
-  }, [i, settings.voiceEnabled]);
+  }, [i, settings.voiceEnabled, narrationVoice]);
 
   // Stop narration on unmount so it doesn't bleed into the next route.
   useEffect(() => {
@@ -162,7 +152,8 @@ export function Onboarding() {
 
       {/* ── Content ──────────────────────────────────────────────────── */}
       <div className="relative flex flex-col h-full safe-top safe-bottom px-6 pb-8 max-w-md mx-auto w-full">
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-between items-center pt-2">
+          <LanguageToggle variant={hasVideoBg ? "light" : "dark"} />
           <button
             onClick={skip}
             className={`text-sm ${
@@ -171,7 +162,7 @@ export function Onboarding() {
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
-            Skip
+            {t("common.skip")}
           </button>
         </div>
 
@@ -188,10 +179,10 @@ export function Onboarding() {
               {i === 0 ? (
                 <SoughMark className="w-28 h-28" />
               ) : (
-                <div className="text-6xl">{SLIDES[i].icon}</div>
+                <div className="text-6xl">{SLIDE_META[i].icon}</div>
               )}
               <h1 className={`text-3xl font-light ${hasVideoBg ? "text-white" : "dark:text-slate-100"}`}>
-                {SLIDES[i].title}
+                {slides[i]?.title}
               </h1>
               <p
                 className={`leading-relaxed max-w-xs ${
@@ -200,7 +191,7 @@ export function Onboarding() {
                     : "text-slate-700 dark:text-slate-300"
                 }`}
               >
-                {SLIDES[i].body}
+                {slides[i]?.body}
               </p>
             </motion.div>
           </AnimatePresence>
@@ -218,13 +209,13 @@ export function Onboarding() {
               transition={{ duration: 0.4, delay: 0.6 }}
               className="text-center text-white/75 text-sm mb-3 pointer-events-none"
             >
-              Tap anywhere to begin
+              {t("onboarding.tapToBegin")}
             </motion.div>
           )}
         </AnimatePresence>
 
         <div className="flex justify-center gap-2 mb-6">
-          {SLIDES.map((_, idx) => (
+          {SLIDE_META.map((_, idx) => (
             <div
               key={idx}
               className={`h-1.5 rounded-full transition-all ${
@@ -242,7 +233,7 @@ export function Onboarding() {
           onClick={next}
           className="w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
-          {isLast ? "Begin" : "Next"}
+          {isLast ? t("common.begin") : t("common.next")}
         </button>
       </div>
     </div>

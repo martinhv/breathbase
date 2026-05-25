@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useTranslation } from "react-i18next";
 import type { ExpandedPhase } from "@/hooks/useBreathSession";
 
 type Props = {
@@ -9,17 +10,22 @@ type Props = {
 };
 
 export function PhaseIndicator({ phase, remainingMs }: Props) {
+  const { t } = useTranslation();
   const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+  // The label and note in techniques.ts are English source strings; we look
+  // them up in the phaseLabels / phaseNotes tables to get the localized form,
+  // falling back to the original string when no translation exists.
+  const label = t(`phaseLabels.${phase.label}`, { defaultValue: phase.label });
+  const note = phase.meta?.note
+    ? t(`phaseNotes.${phase.meta.note}`, { defaultValue: phase.meta.note })
+    : null;
   return (
     <div className="flex flex-col items-center gap-1 text-center select-none">
-      {/* Visual label — aria-hidden so the visually hidden live region below
-          is the single source of truth for screen readers (avoids the label
-          and the live announcement double-speaking). */}
       <div
         aria-hidden
         className="text-3xl sm:text-4xl font-light tracking-wide"
       >
-        {phase.label}
+        {label}
       </div>
       <div
         aria-hidden
@@ -27,19 +33,16 @@ export function PhaseIndicator({ phase, remainingMs }: Props) {
       >
         {seconds}
       </div>
-      {phase.meta?.note && (
+      {note && (
         <div
           aria-hidden
           className="mt-1 text-sm text-slate-600 dark:text-slate-400/90 italic"
         >
-          {phase.meta.note}
+          {note}
         </div>
       )}
-      {/* Screen-reader-only live region. Re-announces on each phase change
-          and includes the starting countdown so non-sighted users can pace
-          themselves. */}
       <div role="status" aria-live="polite" className="sr-only">
-        {phase.label}, {seconds} second{seconds === 1 ? "" : "s"}
+        {label}, {seconds} {t("common.secondsShort")}
       </div>
     </div>
   );

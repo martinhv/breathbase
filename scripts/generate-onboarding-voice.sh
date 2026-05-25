@@ -46,7 +46,13 @@ declare -A VOICES=(
   [priyanka]="BpjGufoPiobT79j2vtj4|eleven_multilingual_v2|0.80|0.85"
   [brittney]="pjcYQlDFKMbcOUp6F5GD|eleven_multilingual_v2|0.80|0.85"
   [christopher]="zO2z8i0srbO9r7GT5C4h|eleven_multilingual_v2|0.80|0.85"
+  [leon]="MJ0RnG71ty4LH3dvNfSd|eleven_multilingual_v2|0.80|0.85"
+  [lana]="rAmra0SCIYOxYmRNDSm3|eleven_multilingual_v2|0.80|0.85"
 )
+
+# Voices that render the GERMAN narration set (NARRATIONS_DE below). Keep in
+# sync with the `language: "de"` flag in src/lib/voiceProfiles.ts.
+DE_VOICES=(leon lana)
 
 # Ordered list of slide slugs (bash assoc arrays don't preserve order).
 SLUGS=(welcome help start-small five-day)
@@ -62,6 +68,25 @@ declare -A NARRATIONS=(
   [start-small]="Five minutes a day is enough. Consistency matters far more than duration — a short practice every morning will do more than an hour once a week."
   [five-day]="We've laid out a five-day Foundations program — one practice per day, each with a short lesson up front, building from simple to more advanced. It's there on the home screen whenever you're ready to begin."
 )
+
+# German equivalents. Same slug names, German prose. The "Suff" substitution
+# isn't needed here — German speakers won't apply English diphthong rules to
+# "Sough", and the ElevenLabs multilingual model handles it naturally in a
+# German phonetic context.
+declare -A NARRATIONS_DE=(
+  [welcome]="Willkommen bei Sough. Atemarbeit ist eines der einfachsten und wirkungsvollsten Werkzeuge, mit denen wir unser Nervensystem beeinflussen können — und die moderne Forschung holt langsam auf, was Praktizierende seit Jahrhunderten wissen. Lass uns beginnen."
+  [help]="Sough kann dir in vielen Situationen helfen. Beruhige dich, wenn der Stress steigt. Finde leichter in den Schlaf, wenn der Kopf nicht ruhig wird. Schärfe deinen Fokus vor etwas Wichtigem. Oder bring deinen Körper wieder in Schwung, wenn dir die Energie fehlt. Jede Technik zielt auf eine bestimmte Reaktion deines Nervensystems."
+  [start-small]="Fünf Minuten am Tag reichen. Beständigkeit zählt weit mehr als Dauer — eine kurze Praxis jeden Morgen bewirkt mehr als eine Stunde einmal pro Woche."
+  [five-day]="Wir haben ein fünftägiges Foundations-Programm vorbereitet — eine Übung pro Tag, jeweils mit einer kurzen Lektion, vom Einfachen zum Anspruchsvollen. Du findest es auf dem Startbildschirm, wann immer du bereit bist."
+)
+
+is_de_voice() {
+  local id="$1"
+  for v in "${DE_VOICES[@]}"; do
+    if [[ "$v" == "$id" ]]; then return 0; fi
+  done
+  return 1
+}
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -116,11 +141,21 @@ for voice in "${TARGET_VOICES[@]}"; do
   mkdir -p "$out_dir"
   echo "=== $voice (model=$model_id) ==="
 
+  if is_de_voice "$voice"; then
+    declare -n active_narrations=NARRATIONS_DE
+    respell_brand=false
+  else
+    declare -n active_narrations=NARRATIONS
+    respell_brand=true
+  fi
+
   for slug in "${TARGET_SLUGS[@]}"; do
-    text="${NARRATIONS[$slug]}"
-    # Pronunciation respell: see the NARRATIONS comment. The on-disk strings
-    # keep the canonical brand; only the bytes sent to ElevenLabs are rewritten.
-    text="${text//Sough/Suff}"
+    text="${active_narrations[$slug]}"
+    # Pronunciation respell: see the NARRATIONS comment. Only applied for the
+    # English voices — German voices handle "Sough" natively in context.
+    if $respell_brand; then
+      text="${text//Sough/Suff}"
+    fi
     out_file="$out_dir/onboarding-$slug.mp3"
     raw_file="$TMP_DIR/$voice-$slug-raw.mp3"
     echo "  $slug (${#text} chars)"

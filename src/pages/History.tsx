@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   computeStreak,
   totalMinutes,
@@ -14,10 +15,10 @@ import { WeeklyChart } from "@/components/WeeklyChart";
 
 type Filter = "all" | Category;
 
-function groupByDay(history: SessionEntry[]): Array<[string, SessionEntry[]]> {
+function groupByDay(history: SessionEntry[], locale: string): Array<[string, SessionEntry[]]> {
   const groups = new Map<string, SessionEntry[]>();
   for (const e of history) {
-    const day = new Date(e.startedAt).toLocaleDateString(undefined, {
+    const day = new Date(e.startedAt).toLocaleDateString(locale, {
       weekday: "short",
       month: "short",
       day: "numeric",
@@ -30,6 +31,7 @@ function groupByDay(history: SessionEntry[]): Array<[string, SessionEntry[]]> {
 }
 
 export function History() {
+  const { t, i18n } = useTranslation();
   const { history, loading } = useHistory();
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -41,38 +43,38 @@ export function History() {
   const streak = computeStreak(history);
   const minutes = totalMinutes(history);
   const sessions = history.length;
-  const grouped = groupByDay(filtered);
+  const grouped = groupByDay(filtered, i18n.language);
 
   return (
     <div className="min-h-full safe-top safe-bottom px-5 pb-8 max-w-md mx-auto">
       <header className="pt-4 pb-5 flex items-center gap-3">
         <Link
           to="/"
-          aria-label="Back"
+          aria-label={t("common.back")}
           className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-600 dark:text-slate-400"
         >
           ←
         </Link>
-        <h1 className="text-2xl font-light">History</h1>
+        <h1 className="text-2xl font-light">{t("history.title")}</h1>
       </header>
 
       <section className="grid grid-cols-3 gap-3 text-center mb-6">
         <div className="p-3 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
           <div className="text-2xl font-light tabular-nums">{streak}</div>
           <div className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mt-1">
-            day streak
+            {t("history.dayStreak")}
           </div>
         </div>
         <div className="p-3 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
           <div className="text-2xl font-light tabular-nums">{minutes}</div>
           <div className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mt-1">
-            minutes
+            {t("history.minutes")}
           </div>
         </div>
         <div className="p-3 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
           <div className="text-2xl font-light tabular-nums">{sessions}</div>
           <div className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400 mt-1">
-            sessions
+            {t("history.sessions")}
           </div>
         </div>
       </section>
@@ -82,11 +84,14 @@ export function History() {
       <section
         className="flex items-center gap-1.5 flex-wrap mb-4"
         role="radiogroup"
-        aria-label="Filter by category"
+        aria-label={t("history.title")}
       >
         {allCategories.map((c) => {
           const active = filter === c;
-          const label = c === "all" ? "All" : CATEGORIES[c].title;
+          const label =
+            c === "all"
+              ? t("history.filterAll")
+              : t(`categories.${c}.title`, { defaultValue: CATEGORIES[c].title });
           return (
             <button
               key={c}
@@ -106,12 +111,16 @@ export function History() {
       </section>
 
       {loading ? (
-        <p className="text-slate-600 dark:text-slate-400 text-sm">Loading…</p>
+        <p className="text-slate-600 dark:text-slate-400 text-sm">{t("common.loading")}</p>
       ) : filtered.length === 0 ? (
         <p className="text-slate-600 dark:text-slate-400 text-sm">
           {filter === "all"
-            ? "No sessions yet."
-            : `No ${CATEGORIES[filter as Category].title.toLowerCase()} sessions yet.`}
+            ? t("history.noSessionsYet")
+            : t("history.noSessionsCategory", {
+                category: t(`categories.${filter as Category}.title`, {
+                  defaultValue: CATEGORIES[filter as Category].title,
+                }),
+              })}
         </p>
       ) : (
         <div className="flex flex-col gap-4">
@@ -129,12 +138,16 @@ export function History() {
                     <div>
                       <div className="text-slate-800 dark:text-slate-200">{h.techniqueName}</div>
                       <div className="text-xs text-slate-600 dark:text-slate-400">
-                        {new Date(h.startedAt).toLocaleTimeString(undefined, {
+                        {new Date(h.startedAt).toLocaleTimeString(i18n.language, {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
                         {" · "}
-                        <span className="capitalize">{h.category}</span>
+                        <span>
+                          {t(`categories.${h.category as Category}.title`, {
+                            defaultValue: h.category,
+                          })}
+                        </span>
                       </div>
                     </div>
                     <div className="text-xs text-slate-700 dark:text-slate-300 tabular-nums">

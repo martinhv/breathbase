@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   BrowserRouter,
   Navigate,
@@ -16,6 +17,12 @@ import { HistoryProvider } from "@/lib/history";
 import { applyTheme, subscribeSystemTheme } from "@/lib/theme";
 import { cancelReminder, scheduleReminder } from "@/lib/notifications";
 import { initAnalytics, trackPageView } from "@/lib/analytics";
+import { applyLanguage, resolveLanguage } from "@/lib/i18n";
+import {
+  defaultVoiceForLanguage,
+  findVoiceProfile,
+  voiceLanguage,
+} from "@/lib/voiceProfiles";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { Home } from "@/pages/Home";
 import { Category } from "@/pages/Category";
@@ -31,9 +38,12 @@ import { Imprint } from "@/pages/Imprint";
 import { Privacy } from "@/pages/Privacy";
 
 function LoadingShell() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-full flex items-center justify-center safe-top safe-bottom">
-      <div className="text-slate-600 dark:text-slate-400 text-sm">Loading…</div>
+      <div className="text-slate-600 dark:text-slate-400 text-sm">
+        {t("common.loading")}
+      </div>
     </div>
   );
 }
@@ -58,6 +68,25 @@ function SignedInApp() {
     if (settings.theme !== "auto") return;
     return subscribeSystemTheme(() => applyTheme(settings.theme));
   }, [settings.theme]);
+
+  // Sync i18next with the saved language preference. `applyLanguage` resolves
+  // the "auto" sentinel against navigator.language internally.
+  useEffect(() => {
+    applyLanguage(settings.language);
+  }, [settings.language]);
+
+  // If the active language no longer matches the saved voice profile (e.g.
+  // user switched from English to German while Christopher was selected),
+  // swap to the language's default voice. Otherwise the session would play
+  // English audio over a German UI.
+  useEffect(() => {
+    if (loading) return;
+    const lang = resolveLanguage(settings.language);
+    const voice = findVoiceProfile(settings.voiceProfile);
+    if (voiceLanguage(voice) !== lang) {
+      update({ voiceProfile: defaultVoiceForLanguage(lang) });
+    }
+  }, [loading, settings.language, settings.voiceProfile, update]);
 
   // Daily practice reminder. Re-arms whenever the toggle or time changes.
   useEffect(() => {

@@ -3,39 +3,46 @@
 
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
 import { track } from "@/lib/analytics";
 import { SoughMark } from "@/components/SoughMark";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 type EmailMode = "signIn" | "signUp";
 
 // Friendly mapping for the Firebase auth error codes we actually expect to
 // hit from this form. Anything outside the list falls back to the raw message.
-function friendlyAuthError(code: string | undefined, fallback: string): string {
-  switch (code) {
-    case "auth/invalid-email":
-      return "That email address doesn't look right.";
-    case "auth/missing-password":
-      return "Please enter your password.";
-    case "auth/weak-password":
-      return "Password is too short. Use at least 6 characters.";
-    case "auth/email-already-in-use":
-      return "An account with that email already exists. Try signing in instead.";
-    case "auth/user-not-found":
-    case "auth/wrong-password":
-    case "auth/invalid-credential":
-      return "Email or password is incorrect.";
-    case "auth/too-many-requests":
-      return "Too many attempts. Try again in a few minutes or reset your password.";
-    case "auth/network-request-failed":
-      return "Network error. Check your connection and try again.";
-    default:
-      return fallback;
-  }
+function useFriendlyAuthError() {
+  const { t } = useTranslation();
+  return (code: string | undefined, fallback: string): string => {
+    switch (code) {
+      case "auth/invalid-email":
+        return t("loginScreen.errInvalidEmail");
+      case "auth/missing-password":
+        return t("loginScreen.errMissingPassword");
+      case "auth/weak-password":
+        return t("loginScreen.errWeakPassword");
+      case "auth/email-already-in-use":
+        return t("loginScreen.errEmailInUse");
+      case "auth/user-not-found":
+      case "auth/wrong-password":
+      case "auth/invalid-credential":
+        return t("loginScreen.errWrongCreds");
+      case "auth/too-many-requests":
+        return t("loginScreen.errTooManyRequests");
+      case "auth/network-request-failed":
+        return t("loginScreen.errNetwork");
+      default:
+        return fallback;
+    }
+  };
 }
 
 export function Login() {
+  const { t } = useTranslation();
+  const friendlyAuthError = useFriendlyAuthError();
   const {
     signInWithGoogle,
     signInWithEmail,
@@ -87,7 +94,7 @@ export function Login() {
     } catch (err) {
       const code = (err as { code?: string }).code;
       setFormError(
-        friendlyAuthError(code, (err as Error).message ?? "Something went wrong"),
+        friendlyAuthError(code, (err as Error).message ?? t("loginScreen.somethingWentWrong")),
       );
     } finally {
       setEmailBusy(false);
@@ -99,16 +106,16 @@ export function Login() {
     setResetInfo(null);
     const target = email.trim();
     if (!target) {
-      setFormError("Enter your email above first, then tap 'Forgot password?'.");
+      setFormError(t("loginScreen.enterEmailFirst"));
       return;
     }
     try {
       await sendPasswordReset(target);
-      setResetInfo(`Sent a reset link to ${target}. Check your inbox.`);
+      setResetInfo(t("loginScreen.resetSent", { email: target }));
     } catch (err) {
       const code = (err as { code?: string }).code;
       setFormError(
-        friendlyAuthError(code, (err as Error).message ?? "Couldn't send reset email"),
+        friendlyAuthError(code, (err as Error).message ?? t("loginScreen.couldNotSend")),
       );
     }
   };
@@ -117,12 +124,15 @@ export function Login() {
 
   return (
     <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
-      <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 pt-8">
+      <div className="flex justify-end pt-2">
+        <LanguageToggle />
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center text-center gap-5 pt-4">
         <SoughMark className="w-28 h-28" />
         <div>
           <h1 className="text-3xl font-light tracking-tight">Sough</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 max-w-xs">
-            Foundational breathwork, grounded in science.
+            {t("loginScreen.tagline")}
           </p>
         </div>
       </div>
@@ -134,7 +144,7 @@ export function Login() {
           disabled={googleBusy || emailBusy}
           className="w-full px-5 py-3.5 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300 disabled:opacity-60 inline-flex items-center justify-center gap-2"
         >
-          <span>Take a breath</span>
+          <span>{t("loginScreen.takeABreath")}</span>
           <span aria-hidden>→</span>
         </button>
         {!showSignIn ? (
@@ -143,14 +153,14 @@ export function Login() {
             onClick={() => setShowSignIn(true)}
             className="mt-3 text-xs text-slate-600 dark:text-slate-400 hover:underline underline-offset-2"
           >
-            Sign in to sync across devices
+            {t("loginScreen.signInToSync")}
           </button>
         ) : (
           <>
             <div className="flex items-center gap-3 py-1 mt-3">
               <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
               <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                or sync across devices
+                {t("loginScreen.orSync")}
               </span>
               <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
             </div>
@@ -161,20 +171,20 @@ export function Login() {
               className="w-full px-5 py-3 rounded-2xl bg-white text-ink-950 font-medium hover:bg-slate-100 disabled:opacity-60 flex items-center justify-center gap-3"
             >
               <GoogleMark />
-              {googleBusy ? "Signing in…" : "Continue with Google"}
+              {googleBusy ? t("loginScreen.signingIn") : t("loginScreen.continueWithGoogle")}
             </button>
 
             <div className="flex items-center gap-3 py-1">
               <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
               <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                or
+                {t("loginScreen.or")}
               </span>
               <div className="flex-1 h-px bg-slate-900/10 dark:bg-white/10" />
             </div>
 
             <form onSubmit={onEmailSubmit} className="flex flex-col gap-2">
               <label className="sr-only" htmlFor="email">
-                Email
+                {t("loginScreen.emailPlaceholder")}
               </label>
               <input
                 id="email"
@@ -183,12 +193,12 @@ export function Login() {
                 inputMode="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
+                placeholder={t("loginScreen.emailPlaceholder")}
                 required
                 className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
               />
               <label className="sr-only" htmlFor="password">
-                Password
+                {t("loginScreen.passwordPlaceholder")}
               </label>
               <input
                 id="password"
@@ -196,7 +206,7 @@ export function Login() {
                 autoComplete={mode === "signIn" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
+                placeholder={t("loginScreen.passwordPlaceholder")}
                 required
                 minLength={6}
                 className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 placeholder:text-slate-500"
@@ -208,11 +218,11 @@ export function Login() {
               >
                 {emailBusy
                   ? mode === "signIn"
-                    ? "Signing in…"
-                    : "Creating account…"
+                    ? t("loginScreen.signingIn")
+                    : t("loginScreen.creatingAccount")
                   : mode === "signIn"
-                    ? "Sign in"
-                    : "Create account"}
+                    ? t("loginScreen.signIn")
+                    : t("loginScreen.createAccount")}
               </button>
             </form>
 
@@ -227,8 +237,8 @@ export function Login() {
                 className="hover:underline underline-offset-2"
               >
                 {mode === "signIn"
-                  ? "Need an account? Create one"
-                  : "Have an account? Sign in"}
+                  ? t("loginScreen.needAccount")
+                  : t("loginScreen.haveAccount")}
               </button>
               {mode === "signIn" && (
                 <button
@@ -236,7 +246,7 @@ export function Login() {
                   onClick={onForgotPassword}
                   className="hover:underline underline-offset-2"
                 >
-                  Forgot password?
+                  {t("loginScreen.forgotPassword")}
                 </button>
               )}
             </div>
@@ -255,18 +265,17 @@ export function Login() {
         )}
 
         <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center max-w-xs mx-auto leading-relaxed pt-3">
-          By continuing you agree to use this app as an educational tool, not
-          medical advice. See safety details after sign-in.
+          {t("loginScreen.educationalNote")}
         </p>
         <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center pt-2">
-          Built with love for{" "}
+          {t("loginScreen.builtForOpenSource")}{" "}
           <a
             href={SOURCE_URL}
             target="_blank"
             rel="noreferrer"
             className="underline-offset-2 hover:underline"
           >
-            open source
+            {t("loginScreen.openSource")}
           </a>
           {" · "}
           <a
@@ -279,11 +288,11 @@ export function Login() {
           </a>
           {" · "}
           <Link to="/imprint" className="underline-offset-2 hover:underline">
-            Imprint
+            {t("loginScreen.imprint")}
           </Link>
           {" · "}
           <Link to="/privacy" className="underline-offset-2 hover:underline">
-            Privacy
+            {t("loginScreen.privacy")}
           </Link>
         </p>
       </div>

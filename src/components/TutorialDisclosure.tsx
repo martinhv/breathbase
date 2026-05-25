@@ -10,15 +10,22 @@
 // in TechniqueCard.
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { TUTORIALS } from "@/lib/tutorials";
-import { DEFAULT_VOICE_PROFILE } from "@/lib/voiceProfiles";
+import { narrationVoiceForLanguage } from "@/lib/voiceProfiles";
 
 export function TutorialDisclosure({ techniqueId }: { techniqueId: string }) {
+  const { t, i18n } = useTranslation();
+  const narrationVoice = narrationVoiceForLanguage(
+    i18n.language.startsWith("de") ? "de" : "en",
+  );
   const [open, setOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const transcript = TUTORIALS[techniqueId];
+  const transcript = t(`tutorials.${techniqueId}`, {
+    defaultValue: TUTORIALS[techniqueId],
+  });
 
   // Wire up audio listeners while the player is mounted.
   useEffect(() => {
@@ -89,10 +96,10 @@ export function TutorialDisclosure({ techniqueId }: { techniqueId: string }) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              Want to know more about this exercise?
+              {t("techniqueCard.wantToKnowMore")}
             </div>
             <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Listen to a short tutorial.
+              {t("techniqueCard.listenShortTutorial")}
             </div>
           </div>
         </div>
@@ -104,7 +111,7 @@ export function TutorialDisclosure({ techniqueId }: { techniqueId: string }) {
     <div className="mt-4 p-3 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 space-y-3 text-left">
       <audio
         ref={audioRef}
-        src={`/voice/${DEFAULT_VOICE_PROFILE}/tutorial-${techniqueId}.mp3`}
+        src={`/voice/${narrationVoice}/tutorial-${techniqueId}.mp3`}
         preload="auto"
         className="hidden"
       />
@@ -112,7 +119,7 @@ export function TutorialDisclosure({ techniqueId }: { techniqueId: string }) {
         <button
           type="button"
           onClick={togglePlayPause}
-          aria-label={playing ? "Pause tutorial" : "Play tutorial"}
+          aria-label={playing ? t("techniqueCard.pauseTutorial") : t("techniqueCard.playTutorial")}
           className="w-10 h-10 rounded-full bg-teal-400/90 text-ink-950 flex items-center justify-center hover:bg-teal-300 shrink-0"
         >
           {playing ? (
@@ -138,7 +145,7 @@ export function TutorialDisclosure({ techniqueId }: { techniqueId: string }) {
             audioRef.current?.pause();
             setOpen(false);
           }}
-          aria-label="Close tutorial"
+          aria-label={t("techniqueCard.closeTutorialAria")}
           className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm px-1"
         >
           ✕

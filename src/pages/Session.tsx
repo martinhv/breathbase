@@ -8,6 +8,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { BreathingOrb } from "@/components/BreathingOrb";
 import { PhaseIndicator } from "@/components/PhaseIndicator";
 import { NostrilDiagram } from "@/components/NostrilDiagram";
@@ -27,7 +28,7 @@ import { findTechnique, type Technique } from "@/lib/techniques";
 import { PROGRAM, getProgramDay, markDayComplete } from "@/lib/program";
 import { hasTutorial } from "@/lib/tutorials";
 import { track } from "@/lib/analytics";
-import { VOICE_PROFILES } from "@/lib/voiceProfiles";
+import { voiceProfilesForLanguage } from "@/lib/voiceProfiles";
 
 type Stage =
   | "safety" // safety modal (only if technique has safetyNotes)
@@ -53,14 +54,15 @@ function formatTime(ms: number): string {
 }
 
 export function Session() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const technique = id ? findTechnique(id) : undefined;
   if (!technique) {
     return (
       <div className="p-6 text-center text-slate-600 dark:text-slate-400 safe-top safe-bottom">
-        <p>Technique not found.</p>
+        <p>{t("session.notFound")}</p>
         <Link to="/" className="text-teal-300 underline">
-          Back home
+          {t("session.backHome")}
         </Link>
       </div>
     );
@@ -74,6 +76,7 @@ export function Session() {
 }
 
 function SessionInner({ technique }: { technique: Technique }) {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { settings, update } = useSettings();
   const { user } = useAuth();
@@ -272,11 +275,15 @@ function SessionInner({ technique }: { technique: Technique }) {
 
   // ── SAFETY ─────────────────────────────────────────────────────────────
   if (stage === "safety") {
+    const translatedNotes = (t(`techniques.${technique.id}.safety`, {
+      defaultValue: technique.safetyNotes ?? [],
+      returnObjects: true,
+    }) as string[]);
     return (
       <SafetyModal
         open
         techniqueName={technique.name}
-        notes={technique.safetyNotes ?? []}
+        notes={translatedNotes}
         recommendFoundation={recommendFoundation}
         onAcknowledge={async () => {
           // Unlock audio within this gesture (in case the Category click's
@@ -307,13 +314,13 @@ function SessionInner({ technique }: { technique: Technique }) {
         <header className="flex items-center justify-between pt-3 pb-2 text-sm">
           <button
             onClick={() => navigate(-1)}
-            aria-label="Back"
+            aria-label={t("common.back")}
             className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-700 dark:text-slate-300"
           >
             ←
           </button>
           <div className="text-[10px] uppercase tracking-widest text-teal-300/80">
-            Day {programDay.day} of {PROGRAM.days.length}
+            {t("session.dayOf", { day: programDay.day, total: PROGRAM.days.length })}
           </div>
           <div className="w-7" />
         </header>
@@ -321,44 +328,44 @@ function SessionInner({ technique }: { technique: Technique }) {
         <main className="flex-1 flex flex-col justify-center gap-5">
           <div>
             <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400">
-              {programDay.durationMin} min · {technique.name}
+              {programDay.durationMin} {t("common.minutesShort")} · {technique.name}
             </div>
             <h1 className="mt-1 text-3xl font-light text-slate-900 dark:text-slate-100">
-              {programDay.headline}
+              {t(`program_days.${programDay.day}.headline`, { defaultValue: programDay.headline })}
             </h1>
           </div>
 
           {programDay.intro.callback && (
             <p className="text-sm italic text-slate-600 dark:text-slate-400 leading-relaxed border-l-2 border-teal-400/40 pl-3">
-              {programDay.intro.callback}
+              {t(`program_days.${programDay.day}.callback`, { defaultValue: programDay.intro.callback })}
             </p>
           )}
 
           <section className="flex flex-col gap-4">
             <div>
               <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
-                Today
+                {t("session.today")}
               </div>
               <p className="text-base text-slate-800 dark:text-slate-200 leading-relaxed">
-                {programDay.intro.learn}
+                {t(`program_days.${programDay.day}.learn`, { defaultValue: programDay.intro.learn })}
               </p>
             </div>
 
             <div>
               <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
-                Why it works
+                {t("session.whyItWorks")}
               </div>
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                {programDay.intro.science}
+                {t(`program_days.${programDay.day}.science`, { defaultValue: programDay.intro.science })}
               </p>
             </div>
 
             <div>
               <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
-                What to notice
+                {t("session.whatToNotice")}
               </div>
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                {programDay.intro.notice}
+                {t(`program_days.${programDay.day}.notice`, { defaultValue: programDay.intro.notice })}
               </p>
             </div>
           </section>
@@ -375,7 +382,7 @@ function SessionInner({ technique }: { technique: Technique }) {
           onClick={() => setStage("active")}
           className="mt-3 w-full px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
-          Begin · {programDay.durationMin}m
+          {t("session.beginWithDuration", { mins: programDay.durationMin })}
         </button>
       </div>
     );
@@ -399,10 +406,10 @@ function SessionInner({ technique }: { technique: Technique }) {
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-light text-slate-900 dark:text-slate-100">
-              A moment to settle
+              {t("session.settleTitle")}
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
-              Rest here for a moment. Notice how you feel.
+              {t("session.settleBody")}
             </p>
           </div>
         </div>
@@ -410,7 +417,7 @@ function SessionInner({ technique }: { technique: Technique }) {
           onClick={() => setStage("complete")}
           className="px-5 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
         >
-          Continue
+          {t("common.continue")}
         </button>
       </div>
     );
@@ -422,22 +429,21 @@ function SessionInner({ technique }: { technique: Technique }) {
       <div className="min-h-full flex flex-col safe-top safe-bottom px-6 pb-8 max-w-md mx-auto">
         <div className="flex-1 flex flex-col items-center text-center pt-8 gap-4">
           <div className="text-5xl">✨</div>
-          <h1 className="text-3xl font-light">Session complete</h1>
+          <h1 className="text-3xl font-light">{t("session.sessionComplete")}</h1>
           <div className="text-sm text-slate-600 dark:text-slate-400">
             <p>{technique.name}</p>
             <p>
               {formatTime(session.totalElapsedMs)} •{" "}
-              {session.cyclesCompleted} cycle
-              {session.cyclesCompleted === 1 ? "" : "s"}
+              {t("common.sessionLabel", { count: session.cyclesCompleted })}
             </p>
           </div>
           {programDay && (
             <div className="mt-2 w-full max-w-xs text-left rounded-2xl bg-teal-400/10 border border-teal-400/30 px-4 py-3">
               <div className="text-[10px] uppercase tracking-widest text-teal-300/90 mb-1">
-                Use this when
+                {t("session.useThisWhen")}
               </div>
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                {programDay.takeaway.useWhen}
+                {t(`program_days.${programDay.day}.useWhen`, { defaultValue: programDay.takeaway.useWhen })}
               </p>
             </div>
           )}
@@ -453,7 +459,7 @@ function SessionInner({ technique }: { technique: Technique }) {
           }
           className="mt-6 px-5 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300"
         >
-          Done
+          {t("common.done")}
         </button>
       </div>
     );
@@ -474,14 +480,16 @@ function SessionInner({ technique }: { technique: Technique }) {
     <div className="min-h-full flex flex-col safe-top safe-bottom px-5 pb-6 max-w-md mx-auto">
       {import.meta.env.DEV && (
         <div className="fixed top-2 right-2 z-50 flex items-center gap-1.5 bg-slate-900/80 text-slate-200 text-xs rounded-lg px-2 py-1 backdrop-blur">
-          <span className="opacity-60">voice</span>
+          <span className="opacity-60">{t("session.debugVoice")}</span>
           <select
             value={settings.voiceProfile}
             onChange={(e) => update({ voiceProfile: e.target.value })}
             className="bg-transparent outline-none cursor-pointer"
-            aria-label="Debug: switch voice profile"
+            aria-label={t("session.debugVoiceAria")}
           >
-            {VOICE_PROFILES.map((p) => (
+            {voiceProfilesForLanguage(
+              i18n.language.startsWith("de") ? "de" : "en",
+            ).map((p) => (
               <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
                 {p.name}
               </option>
@@ -493,7 +501,7 @@ function SessionInner({ technique }: { technique: Technique }) {
       <header className="flex items-center justify-between pt-3 pb-2 text-sm">
         <button
           onClick={() => setShowCloseConfirm(true)}
-          aria-label="Close session"
+          aria-label={t("session.closeSession")}
           className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-700 dark:text-slate-300"
         >
           ✕
@@ -509,37 +517,39 @@ function SessionInner({ technique }: { technique: Technique }) {
         {isReady ? (
           <div className="text-center">
             <div className="text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">
-              Get ready
+              {t("session.getReady")}
             </div>
             <div className="text-7xl font-extralight tabular-nums">
               {Math.max(1, Math.ceil(session.readyRemainingMs / 1000))}
             </div>
             <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm max-w-xs mx-auto">
-              Take a slow breath. Settle in.
+              {t("session.settleIn")}
             </p>
             {recommendFoundation && (
               <div className="mt-4 max-w-xs mx-auto text-left rounded-2xl bg-teal-400/10 border border-teal-400/30 px-4 py-3">
                 <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug">
-                  <strong className="text-slate-900 dark:text-slate-100">New here?</strong>{" "}
-                  Activating techniques can be intense. Try a calmer
-                  practice first.
+                  <strong className="text-slate-900 dark:text-slate-100">{t("session.newHere")}</strong>{" "}
+                  {t("session.newHereActivating")}
                 </p>
                 <Link
                   to="/session/box-breathing"
                   replace
                   className="mt-1.5 inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 underline-offset-2 hover:underline"
                 >
-                  Try Box Breathing first →
+                  {t("session.tryBoxFirst")}
                 </Link>
               </div>
             )}
             {technique.safetyNotes && technique.safetyNotes.length > 0 && (
               <div className="mt-4 max-w-xs mx-auto text-left rounded-2xl bg-amber-400/10 border border-amber-400/30 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-widest text-amber-300/90 mb-2">
-                  Safety reminder
+                  {t("session.safetyReminder")}
                 </div>
                 <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 list-disc pl-4">
-                  {technique.safetyNotes.map((n, i) => (
+                  {(t(`techniques.${technique.id}.safety`, {
+                    defaultValue: technique.safetyNotes,
+                    returnObjects: true,
+                  }) as string[]).map((n, i) => (
                     <li key={i}>{n}</li>
                   ))}
                 </ul>
@@ -569,13 +579,13 @@ function SessionInner({ technique }: { technique: Technique }) {
         <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 uppercase tracking-widest">
           {session.totalRounds > 1 ? (
             <span>
-              Round {session.currentRound} of {session.totalRounds}
+              {t("session.roundOf", { current: session.currentRound, total: session.totalRounds })}
             </span>
           ) : (
             <span />
           )}
           <span>
-            Cycle {session.cyclesCompleted} of {session.totalCycles}
+            {t("session.cycleOf", { current: session.cyclesCompleted, total: session.totalCycles })}
           </span>
         </div>
         <div className="flex gap-3">
@@ -584,13 +594,13 @@ function SessionInner({ technique }: { technique: Technique }) {
             disabled={isReady}
             className="flex-1 px-4 py-3 rounded-2xl bg-slate-900/5 dark:bg-white/10 border border-slate-900/10 dark:border-white/10 text-slate-900 dark:text-slate-100 hover:bg-slate-900/10 dark:hover:bg-white/15 disabled:opacity-40"
           >
-            {isPaused ? "Resume" : "Pause"}
+            {isPaused ? t("common.resume") : t("common.pause")}
           </button>
           <button
             onClick={session.skipToEnd}
             className="flex-1 px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
           >
-            Skip to end
+            {t("common.skipToEnd")}
           </button>
         </div>
       </footer>
@@ -604,14 +614,14 @@ function SessionInner({ technique }: { technique: Technique }) {
         >
           <div className="w-full max-w-sm bg-white dark:bg-ink-800 border border-slate-900/10 dark:border-white/10 rounded-3xl p-6">
             <p className="text-slate-800 dark:text-slate-200 mb-4">
-              End this session? Your progress will not be saved.
+              {t("session.endSessionConfirm")}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCloseConfirm(false)}
                 className="flex-1 px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10"
               >
-                Stay
+                {t("session.stay")}
               </button>
               <button
                 onClick={() => {
@@ -622,7 +632,7 @@ function SessionInner({ technique }: { technique: Technique }) {
                 }}
                 className="flex-1 px-4 py-3 rounded-2xl bg-red-500/80 text-white hover:bg-red-500"
               >
-                End session
+                {t("session.endSession")}
               </button>
             </div>
           </div>

@@ -43,7 +43,19 @@ declare -A VOICES=(
   [priyanka]="BpjGufoPiobT79j2vtj4|eleven_multilingual_v2|0.80|0.85"
   [brittney]="pjcYQlDFKMbcOUp6F5GD|eleven_multilingual_v2|0.80|0.85"
   [christopher]="zO2z8i0srbO9r7GT5C4h|eleven_multilingual_v2|0.80|0.85"
+  [leon]="MJ0RnG71ty4LH3dvNfSd|eleven_multilingual_v2|0.80|0.85"
+  [lana]="rAmra0SCIYOxYmRNDSm3|eleven_multilingual_v2|0.80|0.85"
 )
+
+# Voices that render the GERMAN lesson set (LESSONS_DE below).
+DE_VOICES=(leon lana)
+is_de_voice() {
+  local id="$1"
+  for v in "${DE_VOICES[@]}"; do
+    if [[ "$v" == "$id" ]]; then return 0; fi
+  done
+  return 1
+}
 
 ALL_DAYS=(1 2 3 4 5)
 
@@ -57,6 +69,18 @@ declare -A LESSONS=(
   [4]="Welcome to day four. Yesterday's holds were symmetric. Today we tilt the ratio toward calm. Lean into the exhale: inhale four, hold seven, exhale eight. Long exhales — especially after a hold — strongly activate the parasympathetic branch. It's the breath pattern most reliably linked to faster sleep onset. The exhale through pursed lips should feel slow and audible — like fogging a mirror."
 
   [5]="Welcome to the final day. The last four days were structured practices. Today's tool you can do in ten seconds, anywhere — a reset on demand. Two quick nasal inhales, then one long mouth exhale. The double-inhale re-inflates collapsed alveoli; the long exhale offloads carbon dioxide fast. In a randomized comparison against meditation, this was the single most effective protocol for reducing acute stress. The second inhale is short — just a top-off. The long exhale is where the work happens."
+)
+
+declare -A LESSONS_DE=(
+  [1]="Willkommen zu Tag eins. Bauchgeführte Atmung ist das Fundament, auf dem alles andere aufbaut. Eine langsame Naseneinatmung, die den Bauch dehnt, und eine längere Ausatmung aktivieren den Vagusnerv — Herzfrequenz und Blutdruck sinken. Lege eine Hand auf den Bauch. Er sollte sich beim Einatmen heben, nicht die Brust. Wenn du bereit bist, tippe auf Starten."
+
+  [2]="Willkommen zurück. Gestern hast du den Atem im Bauch verankert. Heute stimmen wir sein Tempo ab. Finde deine Resonanz — etwa fünfeinhalb Atemzüge pro Minute. In diesem Tempo synchronisieren sich Herzfrequenz, Blutdruck und Atmung. Diese Kohärenz maximiert die Herzratenvariabilität — einen Marker autonomer Flexibilität. Weich und gleichmäßig, ein und aus. Das Tempo darf langsam sein, aber niemals angestrengt."
+
+  [3]="Willkommen zu Tag drei. Gestern war der Rhythmus ein Zweiertakt. Heute machen wir einen Vierer daraus — gleiche Zählweise in alle vier Richtungen: ein, halten, aus, halten. Kurze Atempausen trainieren die Kohlendioxid-Toleranz und beruhigen das Nervensystem. Deshalb nutzen Spezialeinheiten das Muster vor heiklen Momenten. Die Pausen sollen sich nicht angestrengt anfühlen. Lockere Hals und Schultern, während du wartest."
+
+  [4]="Willkommen zu Tag vier. Gestern waren die Pausen symmetrisch. Heute neigen wir das Verhältnis Richtung Ruhe. Setze auf die Ausatmung: vier ein, sieben halten, acht aus. Lange Ausatmungen — besonders nach einer Pause — aktivieren den Parasympathikus stark. Es ist das Atemmuster, das am verlässlichsten mit schnellerem Einschlafen verknüpft ist. Die Ausatmung durch gespitzte Lippen soll langsam und hörbar wirken — wie auf einen Spiegel hauchen."
+
+  [5]="Willkommen zum letzten Tag. Die letzten vier Tage waren strukturierte Übungen. Das heutige Werkzeug schaffst du überall in zehn Sekunden — ein Reset auf Abruf. Zwei kurze Naseneinatmungen, dann eine lange Mundausatmung. Die doppelte Einatmung bläst zusammengefallene Lungenbläschen wieder auf; die lange Ausatmung schiebt schnell viel Kohlendioxid raus. In einem randomisierten Vergleich gegen Meditation war es die wirksamste Einzeltechnik gegen akuten Stress. Die zweite Einatmung ist kurz — ein Nachfüllen. Die Arbeit passiert in der langen Ausatmung."
 )
 
 # Split args at "--" separator: voices before, day numbers after.
@@ -97,13 +121,19 @@ for voice in "${TARGET_VOICES[@]}"; do
   mkdir -p "$out_dir"
   echo "=== $voice (model=$model_id) ==="
 
+  if is_de_voice "$voice"; then
+    declare -n active_lessons=LESSONS_DE
+  else
+    declare -n active_lessons=LESSONS
+  fi
+
   for day in "${TARGET_DAYS[@]}"; do
-    if [[ -z "${LESSONS[$day]+x}" ]]; then
+    if [[ -z "${active_lessons[$day]+x}" ]]; then
       echo "Unknown lesson day: $day" >&2
       echo "Available: ${ALL_DAYS[*]}" >&2
       exit 1
     fi
-    text="${LESSONS[$day]}"
+    text="${active_lessons[$day]}"
     out_file="$out_dir/lesson-day-$day.mp3"
     raw_file="$TMP_DIR/$voice-day-$day-raw.mp3"
     echo "  day $day (${#text} chars)"

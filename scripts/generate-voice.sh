@@ -32,6 +32,16 @@ VOICES=(
   "priyanka|BpjGufoPiobT79j2vtj4|eleven_multilingual_v2|0.80|0.85"
   "brittney|pjcYQlDFKMbcOUp6F5GD|eleven_multilingual_v2|0.80|0.85"
   "christopher|zO2z8i0srbO9r7GT5C4h|eleven_multilingual_v2|0.80|0.85"
+  "leon|MJ0RnG71ty4LH3dvNfSd|eleven_multilingual_v2|0.80|0.85"
+  "lana|rAmra0SCIYOxYmRNDSm3|eleven_multilingual_v2|0.80|0.85"
+)
+
+# Voices whose phrase set is the GERMAN translation (PHRASES_DE below) rather
+# than the default English PHRASES dictionary. Keep this in sync with the
+# `language: "de"` flag in src/lib/voiceProfiles.ts.
+DE_VOICES=(
+  "leon"
+  "lana"
 )
 
 # Per-(voice, slug) model overrides for 11l voices. Key is "<profile-id>:<slug>".
@@ -104,6 +114,52 @@ declare -A PHRASES=(
   ["count-14"]="Fourteen"
   ["count-15"]="Fifteen"
 )
+
+# German phrase set. Mirrors PHRASES above, slug-for-slug. Voices listed in
+# DE_VOICES render this set instead of the English one.
+declare -A PHRASES_DE=(
+  ["breathe-in"]="Einatmen"
+  ["breathe-out"]="Ausatmen"
+  ["hold"]="Halten."
+  ["top-up"]="Nachatmen"
+  ["long-exhale"]="Lang ausatmen"
+  ["in"]="Ein."
+  ["out"]="Aus."
+  ["empty-the-lungs"]="Lungen leeren"
+  ["inhale-left"]="Links einatmen"
+  ["exhale-right"]="Rechts ausatmen"
+  ["inhale-right"]="Rechts einatmen"
+  ["exhale-left"]="Links ausatmen"
+  ["settle"]="Ankommen"
+  ["rest"]="Ruhen"
+  ["get-ready"]="Atme langsam ein. Komm an."
+  ["session-end"]="Bleib einen Moment hier. Spüre nach."
+  ["preview"]="Einatmen. Halten. Ausatmen."
+  ["count-1"]="Eins"
+  ["count-2"]="Zwei"
+  ["count-3"]="Drei"
+  ["count-4"]="Vier"
+  ["count-5"]="Fünf"
+  ["count-6"]="Sechs"
+  ["count-7"]="Sieben"
+  ["count-8"]="Acht"
+  ["count-9"]="Neun"
+  ["count-10"]="Zehn"
+  ["count-11"]="Elf"
+  ["count-12"]="Zwölf"
+  ["count-13"]="Dreizehn"
+  ["count-14"]="Vierzehn"
+  ["count-15"]="Fünfzehn"
+)
+
+# Returns 0 if the given voice id is in DE_VOICES.
+is_de_voice() {
+  local id="$1"
+  for v in "${DE_VOICES[@]}"; do
+    if [[ "$v" == "$id" ]]; then return 0; fi
+  done
+  return 1
+}
 
 # Loudness normalization (EBU R128). Applied BEFORE trim and whisper FX so
 # all voices land at the same perceived loudness without us having to boost
@@ -251,10 +307,17 @@ for entry in "${VOICES[@]}"; do
 
   out_dir="$OUT_ROOT/$id"
   mkdir -p "$out_dir"
-  echo "=== $id (model=$model) ==="
-  for slug in "${!PHRASES[@]}"; do
+  if is_de_voice "$id"; then
+    lang_label="de"
+    declare -n active_phrases=PHRASES_DE
+  else
+    lang_label="en"
+    declare -n active_phrases=PHRASES
+  fi
+  echo "=== $id (model=$model, lang=$lang_label) ==="
+  for slug in "${!active_phrases[@]}"; do
     if ! should_render_slug "$slug"; then continue; fi
-    phrase="${PHRASES[$slug]}"
+    phrase="${active_phrases[$slug]}"
     raw="$TMP_DIR/$id-$slug-raw.mp3"
     out="$out_dir/$slug.mp3"
 

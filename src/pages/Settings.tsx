@@ -3,6 +3,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSettings } from "@/lib/settings";
 import { useAuth } from "@/lib/auth";
 import { useSpeech } from "@/hooks/useSpeech";
@@ -10,9 +11,10 @@ import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { exportAllUserData, type Soundscape } from "@/lib/storage";
 import { TECHNIQUES } from "@/lib/techniques";
-import { VOICE_PROFILES } from "@/lib/voiceProfiles";
+import { voiceProfilesForLanguage } from "@/lib/voiceProfiles";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "@/lib/about";
 import { ANALYTICS_CONFIGURED, track } from "@/lib/analytics";
+import { LANGUAGE_OPTIONS, type LanguagePref } from "@/lib/i18n";
 import {
   getPermission as getNotificationPermission,
   isSupported as notificationsSupported,
@@ -26,43 +28,38 @@ import {
   unregisterDevice,
 } from "@/lib/push";
 
-const SOUNDSCAPE_OPTIONS: {
+function useSoundscapeOptions(): {
   id: Soundscape;
   emoji: string;
   label: string;
   description: string;
-}[] = [
-  {
-    id: "piano",
-    emoji: "🎹",
-    label: "Piano ensemble",
-    description: "Salamander grand with strings, cello, pad, and bell.",
-  },
-  {
-    id: "ocean",
-    emoji: "🌊",
-    label: "Ocean",
-    description: "Slow wave-like swells of filtered noise.",
-  },
-  {
-    id: "rain",
-    emoji: "🌧️",
-    label: "Rain",
-    description: "Steady high-frequency wash. Even and enveloping.",
-  },
-  {
-    id: "brown",
-    emoji: "🟫",
-    label: "Brown noise",
-    description: "Deep, full-spectrum hum. Great for masking distractions.",
-  },
-  {
-    id: "silent",
-    emoji: "🔇",
-    label: "Silent",
-    description: "No bed at all — chimes and voice still fire on phase changes.",
-  },
-];
+}[] {
+  // Keyed inline so adding a soundscape doesn't require a new translation
+  // table — labels are hand-translated below.
+  const { t, i18n } = useTranslation();
+  const isDe = i18n.language.startsWith("de");
+  if (isDe) {
+    return [
+      {
+        id: "piano",
+        emoji: "🎹",
+        label: "Klavier-Ensemble",
+        description: "Salamander-Flügel mit Streichern, Cello, Pad und Glocke.",
+      },
+      { id: "ocean", emoji: "🌊", label: "Meer", description: "Langsame, wellenartige Schwellen aus gefiltertem Rauschen." },
+      { id: "rain", emoji: "🌧️", label: "Regen", description: "Gleichmäßiges, hohes Rauschen — gleichmäßig und einhüllend." },
+      { id: "brown", emoji: "🟫", label: "Braunes Rauschen", description: "Tiefer, voller Brumm. Gut, um Ablenkungen zu maskieren." },
+      { id: "silent", emoji: "🔇", label: t("common.skip") ? "Stumm" : "Silent", description: "Kein Klangbett — Glocken und Stimme spielen weiter zu den Phasenwechseln." },
+    ];
+  }
+  return [
+    { id: "piano", emoji: "🎹", label: "Piano ensemble", description: "Salamander grand with strings, cello, pad, and bell." },
+    { id: "ocean", emoji: "🌊", label: "Ocean", description: "Slow wave-like swells of filtered noise." },
+    { id: "rain", emoji: "🌧️", label: "Rain", description: "Steady high-frequency wash. Even and enveloping." },
+    { id: "brown", emoji: "🟫", label: "Brown noise", description: "Deep, full-spectrum hum. Great for masking distractions." },
+    { id: "silent", emoji: "🔇", label: "Silent", description: "No bed at all — chimes and voice still fire on phase changes." },
+  ];
+}
 
 // -- shared subcomponents --------------------------------------------------
 
@@ -128,11 +125,6 @@ const Slider = ({
   </label>
 );
 
-/**
- * Collapsible section using native <details>/<summary> for accessibility and
- * keyboard support out of the box. The summary row matches the card style of
- * inline sections so they don't visually compete.
- */
 type CollapseProps = {
   title: string;
   hint?: string;
@@ -165,7 +157,13 @@ const Collapse = ({ title, hint, defaultOpen = false, children }: CollapseProps)
 // -- page ------------------------------------------------------------------
 
 export function Settings() {
+  const { t, i18n } = useTranslation();
+  const SOUNDSCAPE_OPTIONS = useSoundscapeOptions();
   const { settings, update, reset } = useSettings();
+  // Only show voices that speak the active app language.
+  const VOICE_PROFILES = voiceProfilesForLanguage(
+    i18n.language.startsWith("de") ? "de" : "en",
+  );
   const { user, isGuest, canRegister, signOut, deleteAccount } = useAuth();
   const { preview } = useSpeech();
   const audio = useAudioEngine();
@@ -177,15 +175,10 @@ export function Settings() {
     () => getNotificationPermission(),
   );
 
-  // Re-poll when the user toggles reminders on/off (in case browser dialog
-  // updates permission via the prompt below).
   useEffect(() => {
     setNotifPermission(getNotificationPermission());
   }, [settings.reminderEnabled]);
 
-  // Keep the device's reminder time in Firestore in sync when the user
-  // edits it. The server function reads from Firestore each tick, so a
-  // late write is enough — no need to re-prompt the user.
   useEffect(() => {
     if (!settings.reminderEnabled || !user || isGuest) return;
     if (!isPushAvailable()) return;
@@ -239,7 +232,7 @@ export function Settings() {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("Export failed:", e);
-      alert("Export failed. Please try again.");
+      alert(t("settings.exportFailed"));
     } finally {
       setExporting(false);
     }
@@ -248,8 +241,8 @@ export function Settings() {
   const onDeleteAccount = async () => {
     if (!user) return;
     const message = isGuest
-      ? "Clear all locally-stored settings and session history? This cannot be undone."
-      : "Delete your account and all session history? This cannot be undone.";
+      ? t("settings.confirmClearLocal")
+      : t("settings.confirmDelete");
     const ok = confirm(message);
     if (!ok) return;
     setDeleting(true);
@@ -260,34 +253,44 @@ export function Settings() {
       console.error("Delete failed:", e);
       alert(
         isGuest
-          ? "Could not clear local data. Please try again."
-          : "Account deletion failed. Please try again.",
+          ? t("settings.deleteFailedLocal")
+          : t("settings.deleteFailedAccount"),
       );
       setDeleting(false);
     }
   };
 
   const onSignUpFromGuest = () => {
-    const ok = confirm(
-      "Sign up to sync your settings and history across devices. " +
-        "Your existing data will be carried over to the new account. Continue?",
-    );
+    const ok = confirm(t("settings.signUpFromGuestConfirm"));
     if (!ok) return;
     track("guest_sign_up_intent");
     void signOut();
   };
+
+  const themeLabel =
+    settings.theme === "auto"
+      ? t("settings.themeAuto")
+      : settings.theme === "light"
+        ? t("settings.themeLight")
+        : t("settings.themeDark");
+  const motionLabel =
+    settings.reducedMotion === "auto"
+      ? t("settings.motionAuto")
+      : settings.reducedMotion === "on"
+        ? t("settings.motionOn")
+        : t("settings.motionOff");
 
   return (
     <div className="min-h-full safe-top safe-bottom px-5 pb-8 max-w-md mx-auto">
       <header className="pt-4 pb-5 flex items-center gap-3">
         <Link
           to="/"
-          aria-label="Back"
+          aria-label={t("common.back")}
           className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-600 dark:text-slate-400"
         >
           ←
         </Link>
-        <h1 className="text-2xl font-light">Settings</h1>
+        <h1 className="text-2xl font-light">{t("settings.title")}</h1>
       </header>
 
       {/* -- Account: small, always visible. Data ops hidden behind a collapse. */}
@@ -311,7 +314,7 @@ export function Settings() {
             <div className="flex-1 min-w-0">
               {isGuest ? (
                 <div className="text-sm text-slate-800 dark:text-slate-200 truncate">
-                  Guest mode
+                  {t("settings.guestMode")}
                 </div>
               ) : (
                 user.displayName && (
@@ -321,28 +324,27 @@ export function Settings() {
                 )
               )}
               <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                {isGuest ? "Data stays on this device" : user.email}
+                {isGuest ? t("settings.guestSubtitle") : user.email}
               </div>
             </div>
             {!isGuest && (
               <button
                 onClick={() => {
-                  if (confirm("Sign out?")) void signOut();
+                  if (confirm(t("settings.signOutConfirm"))) void signOut();
                 }}
                 className="px-3 py-2 rounded-lg border border-slate-900/10 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
               >
-                Sign out
+                {t("settings.signOut")}
               </button>
             )}
           </div>
 
-          {/* Guests who CAN register: encourage syncing across devices. */}
           {isGuest && canRegister && (
             <button
               onClick={onSignUpFromGuest}
               className="w-full mt-2 px-4 py-3 rounded-2xl bg-teal-400/90 text-ink-950 text-sm font-medium hover:bg-teal-300 flex items-center justify-between"
             >
-              <span>Sign up to sync across devices</span>
+              <span>{t("settings.signUpToSync")}</span>
               <span aria-hidden>→</span>
             </button>
           )}
@@ -350,38 +352,71 @@ export function Settings() {
       )}
 
       <div className="flex flex-col gap-3">
-        {/* -- Guidance: voice on/off lives here visible; details collapse. */}
         <section className="rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 px-4 divide-y divide-white/5">
           <Toggle
-            label="Voice prompts"
+            label={t("settings.voicePrompts")}
             checked={settings.voiceEnabled}
             onChange={(v) => update({ voiceEnabled: v })}
           />
           <Toggle
-            label="Background music"
+            label={t("settings.backgroundMusic")}
             checked={settings.musicEnabled}
             onChange={(v) => update({ musicEnabled: v })}
           />
           <Toggle
-            label="Chimes"
+            label={t("settings.chimes")}
             checked={settings.chimesEnabled}
             onChange={(v) => update({ chimesEnabled: v })}
           />
           <Toggle
-            label="Haptics"
+            label={t("settings.haptics")}
             checked={settings.hapticsEnabled}
             onChange={(v) => update({ hapticsEnabled: v })}
           />
         </section>
 
+        <Collapse
+          title={t("language.label")}
+          hint={
+            settings.language === "auto"
+              ? t("language.auto")
+              : settings.language === "de"
+                ? t("language.de")
+                : t("language.en")
+          }
+        >
+          <div className="py-3">
+            <label className="flex items-center justify-between">
+              <span className="text-slate-800 dark:text-slate-200">{t("language.label")}</span>
+              <select
+                value={settings.language}
+                onChange={(e) =>
+                  update({ language: e.target.value as LanguagePref })
+                }
+                className="bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 rounded-lg px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
+              >
+                {LANGUAGE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt === "auto"
+                      ? t("language.auto")
+                      : opt === "de"
+                        ? t("language.de")
+                        : t("language.en")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </Collapse>
+
         {settings.musicEnabled && (
           <Collapse
-            title="Soundscape"
+            title={t("settings.soundscape")}
             hint={SOUNDSCAPE_OPTIONS.find((s) => s.id === settings.soundscape)?.label.toLowerCase()}
           >
             <div
               role="radiogroup"
-              aria-label="Soundscape"
+              aria-label={t("settings.soundscape")}
               className="py-3 flex flex-col gap-2"
             >
               {SOUNDSCAPE_OPTIONS.map((s) => {
@@ -419,17 +454,17 @@ export function Settings() {
 
         {settings.voiceEnabled && (
           <Collapse
-            title="Voice"
+            title={t("settings.voice")}
             hint={activeVoice ? `${activeVoice.name} · ${activeVoice.description.split(" · ")[1] ?? activeVoice.description}` : undefined}
           >
             <Toggle
-              label="Count down remaining seconds"
+              label={t("settings.countdown")}
               checked={settings.countdownEnabled}
               onChange={(v) => update({ countdownEnabled: v })}
             />
             <div
               role="radiogroup"
-              aria-label="Voice"
+              aria-label={t("settings.voice")}
               className="py-3 flex flex-col gap-2"
             >
               {VOICE_PROFILES.map((v) => {
@@ -459,10 +494,10 @@ export function Settings() {
                     </button>
                     <button
                       onClick={() => preview(v.id)}
-                      aria-label={`Preview ${v.name}`}
+                      aria-label={t("settings.previewVoice", { name: v.name })}
                       className="px-3 py-1 rounded-lg border border-slate-900/10 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10"
                     >
-                      Play
+                      {t("settings.play")}
                     </button>
                   </div>
                 );
@@ -471,10 +506,13 @@ export function Settings() {
           </Collapse>
         )}
 
-        <Collapse title="Volume" hint={`Master ${Math.round(settings.masterVolume * 100)}%`}>
+        <Collapse
+          title={t("settings.volume")}
+          hint={`${t("settings.master")} ${Math.round(settings.masterVolume * 100)}%`}
+        >
           <div className="divide-y divide-white/5">
             <Slider
-              label="Master"
+              label={t("settings.master")}
               value={Math.round(settings.masterVolume * 100)}
               min={0}
               max={100}
@@ -482,7 +520,7 @@ export function Settings() {
               format={(v) => `${v}%`}
             />
             <Slider
-              label="Music"
+              label={t("settings.music")}
               value={Math.round(settings.musicVolume * 100)}
               min={0}
               max={100}
@@ -490,7 +528,7 @@ export function Settings() {
               format={(v) => `${v}%`}
             />
             <Slider
-              label="Chimes"
+              label={t("settings.chimes")}
               value={Math.round(settings.chimeVolume * 100)}
               min={0}
               max={100}
@@ -498,7 +536,7 @@ export function Settings() {
               format={(v) => `${v}%`}
             />
             <Slider
-              label="Voice"
+              label={t("settings.voice")}
               value={Math.round(settings.voiceVolume * 100)}
               min={0}
               max={100}
@@ -508,27 +546,27 @@ export function Settings() {
           </div>
         </Collapse>
 
-        <Collapse title="Per-technique durations">
+        <Collapse title={t("settings.perTechniqueDurations")}>
           <div className="divide-y divide-white/5">
-            {TECHNIQUES.map((t) => {
+            {TECHNIQUES.map((tt) => {
               const current =
-                settings.durationOverrides[t.id] ?? t.defaultDurationMin;
+                settings.durationOverrides[tt.id] ?? tt.defaultDurationMin;
               return (
                 <Slider
-                  key={t.id}
-                  label={t.name}
+                  key={tt.id}
+                  label={tt.name}
                   value={current}
-                  min={t.durationRangeMin[0]}
-                  max={t.durationRangeMin[1]}
+                  min={tt.durationRangeMin[0]}
+                  max={tt.durationRangeMin[1]}
                   onChange={(v) =>
                     update({
                       durationOverrides: {
                         ...settings.durationOverrides,
-                        [t.id]: v,
+                        [tt.id]: v,
                       },
                     })
                   }
-                  format={(v) => `${v} min`}
+                  format={(v) => `${v} ${t("common.minutesShort")}`}
                 />
               );
             })}
@@ -536,27 +574,22 @@ export function Settings() {
         </Collapse>
 
         <Collapse
-          title="Reminders"
+          title={t("settings.reminders")}
           hint={
             settings.reminderEnabled
-              ? `daily · ${settings.reminderTime}`
-              : "off"
+              ? t("settings.remindersDailyHint", { time: settings.reminderTime })
+              : t("settings.remindersOff")
           }
         >
           <div className="divide-y divide-slate-900/5 dark:divide-white/5">
             <Toggle
-              label="Daily practice reminder"
+              label={t("settings.remindersDaily")}
               checked={settings.reminderEnabled}
               onChange={async (v) => {
                 if (v) {
                   const result = await requestNotificationPermission();
                   setNotifPermission(result);
-                  if (result !== "granted") {
-                    // Don't enable if the user denied or the browser blocked.
-                    return;
-                  }
-                  // If push is configured (VAPID + production Firebase),
-                  // register an FCM token for server-side delivery.
+                  if (result !== "granted") return;
                   if (isPushAvailable() && user) {
                     const token = await obtainPushToken();
                     if (token) {
@@ -568,7 +601,6 @@ export function Settings() {
                     }
                   }
                 } else if (isPushAvailable() && user) {
-                  // Best-effort cleanup of any prior FCM registration.
                   const token = await obtainPushToken();
                   if (token) await unregisterDevice(user.uid, token);
                 }
@@ -578,7 +610,7 @@ export function Settings() {
             />
             {settings.reminderEnabled && (
               <label className="flex items-center justify-between py-3">
-                <span className="text-slate-800 dark:text-slate-200">Time</span>
+                <span className="text-slate-800 dark:text-slate-200">{t("settings.remindersTime")}</span>
                 <input
                   type="time"
                   value={settings.reminderTime}
@@ -591,23 +623,23 @@ export function Settings() {
             )}
             <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed py-3">
               {!notificationsSupported()
-                ? "Notifications aren't available in this browser."
+                ? t("settings.remindersUnsupported")
                 : notifPermission === "denied"
-                  ? "Notifications are blocked. Enable them for sough.app in your browser settings, then re-enable here."
+                  ? t("settings.remindersBlocked")
                   : isPushAvailable()
-                    ? "Reminders are delivered via Firebase Cloud Messaging — they fire even when Sough is closed."
-                    : "Reminders fire only while Sough is open in a tab. Set VITE_FIREBASE_VAPID_KEY and deploy the reminder Cloud Function for background push (see README)."}
+                    ? t("settings.remindersBackground")
+                    : t("settings.remindersForeground")}
             </p>
           </div>
         </Collapse>
 
         <Collapse
-          title="Display"
-          hint={`${settings.theme} · motion ${settings.reducedMotion}`}
+          title={t("settings.display")}
+          hint={t("settings.displayHint", { theme: themeLabel, motion: motionLabel })}
         >
           <div className="divide-y divide-slate-900/5 dark:divide-white/5">
             <label className="flex items-center justify-between py-3">
-              <span className="text-slate-800 dark:text-slate-200">Theme</span>
+              <span className="text-slate-800 dark:text-slate-200">{t("settings.theme")}</span>
               <select
                 value={settings.theme}
                 onChange={(e) =>
@@ -617,14 +649,14 @@ export function Settings() {
                 }
                 className="bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 rounded-lg px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
               >
-                <option value="auto">Auto (follow system)</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+                <option value="auto">{t("settings.themeAuto")}</option>
+                <option value="light">{t("settings.themeLight")}</option>
+                <option value="dark">{t("settings.themeDark")}</option>
               </select>
             </label>
             <label className="flex items-center justify-between py-3">
               <span className="text-slate-800 dark:text-slate-200">
-                Reduce motion
+                {t("settings.motion")}
               </span>
               <select
                 value={settings.reducedMotion}
@@ -635,62 +667,58 @@ export function Settings() {
                 }
                 className="bg-slate-100 dark:bg-ink-700 border border-slate-900/10 dark:border-white/10 rounded-lg px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
               >
-                <option value="auto">Auto (follow system)</option>
-                <option value="on">On</option>
-                <option value="off">Off</option>
+                <option value="auto">{t("settings.motionAuto")}</option>
+                <option value="on">{t("settings.motionOn")}</option>
+                <option value="off">{t("settings.motionOff")}</option>
               </select>
             </label>
           </div>
         </Collapse>
 
-        <Collapse title="Test sound">
+        <Collapse title={t("settings.testSound")}>
           <div className="py-3">
             <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
-              Tap below to hear a sample chime and chord. If you hear nothing,
-              check your system volume and that no other app is muting the tab.
+              {t("settings.testSoundHint")}
             </p>
             <button
               onClick={runTest}
               disabled={testing}
               className="w-full px-4 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300 disabled:opacity-60"
             >
-              {testing ? "Playing test sound…" : "Test sound"}
+              {testing ? t("settings.playingTestSound") : t("settings.testSoundButton")}
             </button>
           </div>
         </Collapse>
 
         {ANALYTICS_CONFIGURED && (
           <Collapse
-            title="Privacy"
-            hint={settings.analyticsEnabled ? "analytics on" : "analytics off"}
+            title={t("settings.privacy")}
+            hint={settings.analyticsEnabled ? t("settings.analyticsOn") : t("settings.analyticsOff")}
           >
             <div className="divide-y divide-slate-900/5 dark:divide-white/5">
               <Toggle
-                label="Help improve Sough (anonymous usage)"
+                label={t("settings.helpImprove")}
                 checked={settings.analyticsEnabled}
                 onChange={(v) => update({ analyticsEnabled: v })}
               />
               <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed py-3">
-                Self-hosted, cookieless. Sends page views, session completions
-                by technique, and which soundscape / voice / program you pick.
-                No personal data, no third-party trackers — see the source for
-                the full event list.
+                {t("settings.analyticsNote")}
               </p>
             </div>
           </Collapse>
         )}
 
         {user && (
-          <Collapse title="Data & account">
+          <Collapse title={t("settings.dataAccount")}>
             <div className="divide-y divide-white/5">
               <button
                 onClick={exportData}
                 disabled={exporting}
                 className="w-full flex items-center justify-between py-3 text-sm text-slate-800 dark:text-slate-200 hover:opacity-90 disabled:opacity-50"
               >
-                <span>Export my data (JSON)</span>
+                <span>{t("settings.exportData")}</span>
                 <span className="text-xs text-slate-600 dark:text-slate-400">
-                  {exporting ? "Preparing…" : "Download"}
+                  {exporting ? t("settings.exportPreparing") : t("settings.exportDownload")}
                 </span>
               </button>
               <button
@@ -699,10 +727,10 @@ export function Settings() {
                 className="w-full flex items-center justify-between py-3 text-sm text-red-300/90 hover:opacity-90 disabled:opacity-50"
               >
                 <span>
-                  {isGuest ? "Clear local data" : "Delete account and all data"}
+                  {isGuest ? t("settings.clearLocal") : t("settings.deleteAccount")}
                 </span>
                 <span className="text-xs text-red-300/70">
-                  {deleting ? "Deleting…" : "Permanent"}
+                  {deleting ? t("settings.deleting") : t("settings.permanent")}
                 </span>
               </button>
             </div>
@@ -715,15 +743,15 @@ export function Settings() {
           onClick={() => setShowDisclaimer(true)}
           className="px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-sm"
         >
-          View safety disclaimer
+          {t("settings.viewDisclaimer")}
         </button>
         <button
           onClick={() => {
-            if (confirm("Reset all settings to defaults?")) reset();
+            if (confirm(t("settings.resetConfirm"))) reset();
           }}
           className="px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-sm"
         >
-          Reset settings
+          {t("settings.resetSettings")}
         </button>
       </section>
 
@@ -734,7 +762,7 @@ export function Settings() {
           rel="noreferrer"
           className="underline-offset-2 hover:underline"
         >
-          Source code
+          {t("settings.footerSource")}
         </a>
         {" · "}
         <a
@@ -747,11 +775,11 @@ export function Settings() {
         </a>
         {" · "}
         <Link to="/imprint" className="underline-offset-2 hover:underline">
-          Imprint
+          {t("settings.footerImprint")}
         </Link>
         {" · "}
         <Link to="/privacy" className="underline-offset-2 hover:underline">
-          Privacy
+          {t("settings.footerPrivacy")}
         </Link>
       </footer>
 

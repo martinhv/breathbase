@@ -13,7 +13,8 @@
 // card silent and visually unchanged for those users.
 
 import { useEffect, useRef, useState } from "react";
-import { DEFAULT_VOICE_PROFILE } from "@/lib/voiceProfiles";
+import { useTranslation } from "react-i18next";
+import { narrationVoiceForLanguage } from "@/lib/voiceProfiles";
 
 export function LessonNarrationBar({
   day,
@@ -22,6 +23,10 @@ export function LessonNarrationBar({
   day: number;
   enabled: boolean;
 }) {
+  const { t, i18n } = useTranslation();
+  const narrationVoice = narrationVoiceForLanguage(
+    i18n.language.startsWith("de") ? "de" : "en",
+  );
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -72,14 +77,14 @@ export function LessonNarrationBar({
     <div className="flex items-center gap-3 px-3 py-2 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
       <audio
         ref={audioRef}
-        src={`/voice/${DEFAULT_VOICE_PROFILE}/lesson-day-${day}.mp3`}
+        src={`/voice/${narrationVoice}/lesson-day-${day}.mp3`}
         preload="auto"
         className="hidden"
       />
       <button
         type="button"
         onClick={togglePlayPause}
-        aria-label={playing ? "Pause lesson" : "Play lesson"}
+        aria-label={playing ? t("history.pauseLesson") : t("history.playLesson")}
         className="w-9 h-9 rounded-full bg-teal-400/90 text-ink-950 flex items-center justify-center hover:bg-teal-300 shrink-0"
       >
         {playing ? (
@@ -95,7 +100,7 @@ export function LessonNarrationBar({
       </button>
       <div className="flex-1 min-w-0">
         <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
-          Narrated lesson
+          {t("history.narratedLesson")}
         </div>
         <div className="h-1 bg-slate-900/10 dark:bg-white/10 rounded-full overflow-hidden">
           <div

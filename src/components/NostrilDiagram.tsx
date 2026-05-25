@@ -1,20 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Martin Hirschvogel <https://github.com/martinhv>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useTranslation } from "react-i18next";
+
 type Props = { nostril: "left" | "right" | null };
 
-/**
- * Schematic head with a hand pressing one nostril closed for alternate-nostril
- * breathing. `nostril` is the *open* nostril (the one the user is breathing
- * through this phase) — the diagram shows a fingertip on the opposite side.
- */
 export function NostrilDiagram({ nostril }: Props) {
+  const { t } = useTranslation();
   if (!nostril) return null;
-  // The "closed" side is the opposite of the open side.
   const closeRight = nostril === "left";
+  const sideLabel = nostril === "left" ? t("session.nostrilLeft") : t("session.nostrilRight");
   return (
     <div
-      aria-label={`${nostril} nostril open`}
+      aria-label={t("session.nostrilOpen", { side: sideLabel })}
       role="img"
       className="flex flex-col items-center gap-2"
     >
@@ -24,7 +22,6 @@ export function NostrilDiagram({ nostril }: Props) {
         height="96"
         className="text-slate-800 dark:text-slate-200"
       >
-        {/* Face */}
         <circle
           cx="60"
           cy="60"
@@ -34,7 +31,6 @@ export function NostrilDiagram({ nostril }: Props) {
           strokeOpacity="0.4"
           strokeWidth="2"
         />
-        {/* Nose */}
         <path
           d="M60 50 L60 72"
           stroke="currentColor"
@@ -42,7 +38,6 @@ export function NostrilDiagram({ nostril }: Props) {
           strokeWidth="2"
           strokeLinecap="round"
         />
-        {/* Nostril dots */}
         <circle
           cx="54"
           cy="76"
@@ -57,7 +52,6 @@ export function NostrilDiagram({ nostril }: Props) {
           fill={closeRight ? "#5eead4" : "currentColor"}
           opacity={closeRight ? 1 : 0.3}
         />
-        {/* Finger (a rounded rectangle on the closed side) */}
         <rect
           x={closeRight ? "44" : "68"}
           y="68"
@@ -69,7 +63,7 @@ export function NostrilDiagram({ nostril }: Props) {
         />
       </svg>
       <div className="text-xs uppercase tracking-widest text-slate-600 dark:text-slate-400">
-        Open: {nostril}
+        {t("session.open", { side: sideLabel })}
       </div>
     </div>
   );

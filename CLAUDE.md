@@ -7,6 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Do NOT add a `Co-Authored-By: Claude …` trailer to commits in this
   repo.** Author the commit normally — the user wants a clean history
   without AI co-author attribution.
+- **Environment variables** (Firebase config, `ELEVENLABS_API_KEY`,
+  `VITE_LEGAL_*`, `VITE_UMAMI_*`, etc.) live in `.env.local` for actual
+  values and `.env.example` for the documented variable names. Both are at
+  the repo root. Don't go hunting elsewhere — source `.env.local` directly
+  (`set -a; . ./.env.local; set +a`) when a script needs them.
 
 ## Commands
 

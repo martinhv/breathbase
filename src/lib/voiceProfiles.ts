@@ -20,6 +20,10 @@ export type VoiceProfile = {
   description: string;
   /** Source voice (ElevenLabs voice id). Informational. */
   sourceVoice: string;
+  /** BCP-47 language tag the voice speaks. Defaults to "en" when omitted.
+   *  Used to auto-pick a language-appropriate voice when the user switches
+   *  language and hasn't manually chosen one. */
+  language?: string;
 };
 
 export const VOICE_PROFILES: VoiceProfile[] = [
@@ -67,7 +71,37 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     description: "US English · intimate, meditative male",
     sourceVoice: "ElevenLabs · Christopher",
   },
+  {
+    id: "leon",
+    name: "Leon",
+    description: "Deutsch · ruhige männliche Stimme",
+    sourceVoice: "ElevenLabs · MJ0RnG71ty4LH3dvNfSd",
+    language: "de",
+  },
+  {
+    id: "lana",
+    name: "Lana",
+    description: "Deutsch · ruhige weibliche Stimme",
+    sourceVoice: "ElevenLabs · rAmra0SCIYOxYmRNDSm3",
+    language: "de",
+  },
 ];
+
+/** Default voice id used when the user's language preference resolves to `lang`.
+ *  Falls back to the global default for unknown languages. */
+export function defaultVoiceForLanguage(lang: string): string {
+  if (lang === "de") return "leon";
+  return DEFAULT_EXERCISE_VOICE_PROFILE;
+}
+
+/** Voice profile id that holds the long-form narration clips (onboarding,
+ *  tutorials, lessons) for the given UI language. These clips are baked once
+ *  per language, not per user-selected exercise voice, so this is a fixed
+ *  pick rather than a user setting. */
+export function narrationVoiceForLanguage(lang: string): string {
+  if (lang === "de") return "leon";
+  return DEFAULT_VOICE_PROFILE;
+}
 
 // Used for app narration (onboarding slides, technique tutorials, lesson
 // audio) and as the fallback when a saved voice ID is unknown. Theo has the
@@ -82,3 +116,10 @@ export const DEFAULT_EXERCISE_VOICE_PROFILE = "christopher";
 export const findVoiceProfile = (id: string): VoiceProfile =>
   VOICE_PROFILES.find((v) => v.id === id) ??
   VOICE_PROFILES.find((v) => v.id === DEFAULT_VOICE_PROFILE)!;
+
+/** The language tag a voice profile speaks. Defaults to "en" when unset. */
+export const voiceLanguage = (v: VoiceProfile): string => v.language ?? "en";
+
+/** Subset of VOICE_PROFILES whose spoken language matches `lang`. */
+export const voiceProfilesForLanguage = (lang: string): VoiceProfile[] =>
+  VOICE_PROFILES.filter((v) => voiceLanguage(v) === lang);

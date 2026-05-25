@@ -65,17 +65,18 @@ export function nextReminderAt(
   return next;
 }
 
-function show(): void {
+async function show(): Promise<void> {
   if (!isSupported() || Notification.permission !== "granted") return;
   try {
-    new Notification("Time to practice", {
-      body: "A few minutes of breathwork.",
+    const i18n = (await import("./i18n")).default;
+    new Notification(i18n.t("notifications.title"), {
+      body: i18n.t("notifications.body"),
       icon: "/icon-512.svg",
       tag: REMINDER_TAG,
     });
   } catch {
-    // Some browsers throw when a Notification is constructed from a hidden
-    // page — silently ignore; the next open tab will reschedule.
+    // Browsers can throw when constructing a Notification from a hidden tab.
+    // Silently swallow — the next open tab will reschedule.
   }
 }
 
@@ -96,7 +97,7 @@ export function scheduleReminder(time: string): void {
   const delay = Math.max(0, at.getTime() - Date.now());
   // setTimeout caps at ~24.8 days; we schedule at most 24h ahead so safe.
   activeTimer = window.setTimeout(() => {
-    show();
+    void show();
     // After firing, queue tomorrow's reminder.
     scheduleReminder(time);
   }, delay);

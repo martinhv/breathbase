@@ -27,6 +27,7 @@ import {
 import { db, isLocalUid, LOCAL_UID } from "./firebase";
 import { DEFAULT_EXERCISE_VOICE_PROFILE } from "./voiceProfiles";
 import { DEFAULT_PROGRAM_STATE, type ProgramState } from "./program";
+import type { LanguagePref } from "./i18n";
 
 export type SessionEntry = {
   /** Firestore document ID (omitted on write; populated on read). */
@@ -81,6 +82,8 @@ export type Settings = {
   /** Opt-out for the self-hosted Umami analytics. No-op when the build
    *  wasn't configured with VITE_UMAMI_* anyway. Default on. */
   analyticsEnabled: boolean;
+  /** UI + voice language preference. "auto" follows navigator.language. */
+  language: LanguagePref;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -106,6 +109,7 @@ export const DEFAULT_SETTINGS: Settings = {
   disclaimerAcknowledged: false,
   acknowledgedSafety: [],
   analyticsEnabled: true,
+  language: "auto",
 };
 
 const HISTORY_LIMIT = 200; // cap reads to last 200 sessions

@@ -21,8 +21,17 @@
 
 set -euo pipefail
 
-if [[ -f .env.local ]]; then
-  set -a; . ./.env.local; set +a
+# Extract ELEVENLABS_API_KEY from .env.local without sourcing the whole file —
+# Vite-style dotenv allows unquoted values with spaces (e.g. company names in
+# VITE_LEGAL_*), which `sh source` chokes on.
+if [[ -f .env.local && -z "${ELEVENLABS_API_KEY:-}" ]]; then
+  line=$(grep -E '^ELEVENLABS_API_KEY=' .env.local | head -1) || true
+  if [[ -n "$line" ]]; then
+    value=${line#ELEVENLABS_API_KEY=}
+    [[ "$value" == \"*\" && "$value" == *\" ]] && value=${value:1:-1}
+    [[ "$value" == \'*\' && "$value" == *\' ]] && value=${value:1:-1}
+    export ELEVENLABS_API_KEY="$value"
+  fi
 fi
 
 : "${ELEVENLABS_API_KEY:?ELEVENLABS_API_KEY not set — needed for ElevenLabs API}"
@@ -34,7 +43,19 @@ declare -A VOICES=(
   [priyanka]="BpjGufoPiobT79j2vtj4|eleven_multilingual_v2|0.80|0.85"
   [brittney]="pjcYQlDFKMbcOUp6F5GD|eleven_multilingual_v2|0.80|0.85"
   [christopher]="zO2z8i0srbO9r7GT5C4h|eleven_multilingual_v2|0.80|0.85"
+  [leon]="MJ0RnG71ty4LH3dvNfSd|eleven_multilingual_v2|0.80|0.85"
+  [lana]="rAmra0SCIYOxYmRNDSm3|eleven_multilingual_v2|0.80|0.85"
 )
+
+# Voices that render the GERMAN tutorial set (TUTORIALS_DE below).
+DE_VOICES=(leon lana)
+is_de_voice() {
+  local id="$1"
+  for v in "${DE_VOICES[@]}"; do
+    if [[ "$v" == "$id" ]]; then return 0; fi
+  done
+  return 1
+}
 
 ALL_SLUGS=(
   physiological-sigh
@@ -124,6 +145,83 @@ This is the practice meditators have used for centuries. Modern research links s
 Use it as a five-minute attention reset between tasks. Or extend the count to six or eight seconds for a deeper effect — though four works fine. The key is consistency, not intensity."
 )
 
+# German tutorials — same slug names, German prose.
+declare -A TUTORIALS_DE=(
+  [physiological-sigh]="Der physiologische Seufzer ist der schnellste Weg, dein Nervensystem in Echtzeit zu beruhigen. Es ist ein Muster, das dein Körper schon von selbst nutzt, wenn du aufgewühlt bist — wir machen es nur bewusst.
+
+Die Mechanik ist einfach. Atme kurz durch die Nase ein. Fülle mit einer zweiten, schnellen Einatmung nach — kurz und knapp. Dann lass alles in einer langen, ausgedehnten Ausatmung durch den Mund los.
+
+Die zweite Einatmung dehnt die kleinen Lungenbläschen, die Alveolen, vollständig aus. Folgt die lange Ausatmung, gibt sie einen großen Schub Kohlendioxid ab — das signalisiert deinem Gehirn, die Herzfrequenz zu drosseln und die Erregung zu senken.
+
+Diese eine Übung kann dich in Sekunden aus einer Stressspitze holen. Sie wurde direkt mit Meditation und anderen Atemtechniken verglichen — und beim kurzfristigen Stimmungsschub kam sie auf Platz eins. Setze sie ein, wann immer du Anspannung aufsteigen spürst. Schon ein bis zwei Zyklen wirken."
+
+  [four-seven-eight]="Die Vier-Sieben-Acht-Atmung ist eine Einschlaf- und Entspannungstechnik. Die Zahlen sind der Rhythmus: vier Sekunden einatmen, sieben Sekunden den Atem halten, acht Sekunden durch gespitzte Lippen ausatmen.
+
+Das lange Halten hebt den Kohlendioxid-Spiegel leicht an, wodurch sich die Blutgefäße weiten und der Vagustonus steigt. Die verlängerte Ausatmung aktiviert deinen Parasympathikus — die Ruhe-und-Verdauungs-Seite. Zusammen kippt der Körper in Richtung Entspannung.
+
+Nutze sie im Bett, wenn dein Kopf nicht zur Ruhe kommt. Viele Menschen schlafen nach drei bis vier Zyklen ein, auch wenn es ein paar Tage Übung braucht, bis das verlässlich klappt.
+
+Beginne sanft. Wenn sich sieben Sekunden halten zu anstrengend anfühlt, skaliere alles herunter — drei-fünf-sechs funktioniert ebenso. Komfort ist wichtiger als die exakten Zahlen. Es geht um die langsame Ausatmung."
+
+  [diaphragmatic]="Die Zwerchfellatmung — auch Bauchatmung genannt — ist das Fundament, auf dem alles andere aufbaut. Die meisten von uns atmen flach in die Brust. Diese Technik trainiert dein Zwerchfell, die Arbeit zu tun, für die es gebaut ist.
+
+Lege eine Hand auf die Brust, die andere auf den Bauch. Atme langsam durch die Nase ein, indem du den Bauch nach außen weitest — die Brusthand sollte sich kaum bewegen. Atme dann langsam aus, etwas länger als ein, und lass den Bauch wieder weich werden.
+
+Warum ist das wichtig? Bauchgeführte Atmung stimuliert den Vagusnerv, die Hauptbahn deines Parasympathikus. Die Herzfrequenz sinkt. Der Blutdruck wird leichter. Stresshormone gehen zurück. Mit der Zeit wird auch dein Ruhe-Atem tiefer und langsamer, ohne Anstrengung.
+
+Wenn du nur eine Sache machst, dann diese. Fünf Minuten am Tag, am besten morgens oder vor dem Schlafen. Es ist die günstigste und am besten belegte Intervention der Atemarbeit."
+
+  [energizing-breath]="Energizing Breath ist eine anfängerfreundliche Variante der Wim-Hof-Methode. Sie nutzt Zyklen schneller, bewusster Atmung gefolgt von langen Atempausen, um Körper und Geist mit Sauerstoff und Adrenalin zu fluten.
+
+Das Muster ist: dreißig aktive Atemzüge — zwei Sekunden Naseneinatmung, eine Sekunde passive Mundausatmung. Dann eine letzte volle Ausatmung und ein langes Halten in der leeren Lunge — bis du den Drang spürst, wieder zu atmen. Danach eine Erholungs-Einatmung, fünfzehn Sekunden voll halten, und loslassen. Wiederhole das Ganze zweimal.
+
+Das hebt den sympathischen Tonus — die aktivierende Seite deines Nervensystems. Du wirst wahrscheinlich Wärme, Kribbeln und scharfe Wachheit spüren. Studien zeigen, dass sich damit die Immunreaktion willentlich aktivieren und der Fokus steigern lässt.
+
+Wichtige Sicherheit: niemals im oder am Wasser üben, nicht beim Autofahren. Aussetzen in der Schwangerschaft oder bei Herz-Kreislauf-Erkrankungen. Sofort stoppen, wenn dir schwindlig wird — diese Technik kann Ohnmacht auslösen."
+
+  [bellows-breath]="Die Blasebalg-Atmung, Bhastrika, ist ein schneller Weg, Körper und Gehirn zu wecken. Die Mechanik ist einfach, aber kraftvoll. Atme zwei Sekunden lang kraftvoll durch die Nase ein, dann zwei Sekunden lang kraftvoll durch die Nase aus — gleich, rhythmisch, wie ein Blasebalg, der Luft pumpt.
+
+Du machst etwa acht solcher Atemzüge pro Runde, dann fünfzehn Sekunden Pause — eine langsame Einatmung zum Ankommen und eine längere Ausatmung zum Loslassen. Drei Runden insgesamt.
+
+Die schnelle Atmung erhöht den sympathischen Tonus — Herzfrequenz, Wachheit und Sauerstoffversorgung steigen. Im Yoga wird sie vor der Meditation eingesetzt, um geistigen Nebel zu klären. Moderne Forschung bestätigt, dass sie die Herzratenvariabilität in einen aktivierten Zustand verschiebt.
+
+Sitze aufrecht mit geradem Rücken. Der Atem soll aus dem Bauch kommen, nicht aus den Schultern. Wenn dir schwindlig wird, höre auf und atme normal — für Anfänger ist das intensiv. Steigere dich langsam."
+
+  [box-breathing]="Box-Atmung folgt einem einfachen Muster aus vier gleichen Abschnitten. Vier Sekunden einatmen. Vier Sekunden halten. Vier Sekunden ausatmen. Dann vier Sekunden leer halten. Jede Seite des Quadrats ist gleich lang — daher der Name.
+
+Diese Technik wurde von den Navy SEALs für Einsätze unter hohem Stress bekannt gemacht. Weil jede Phase gleich lang ist, stabilisiert sie dein autonomes Nervensystem, ohne stark in Richtung Beruhigung oder Aktivierung zu kippen. Es ist ein ausgewogener Reset.
+
+Sie ist besonders nützlich vor etwas Stressigem — einer Präsentation, einem schwierigen Gespräch oder jedem Moment, in dem du wach, aber gefasst sein willst.
+
+Setz dich bequem hin. Atme durch die Nase, wenn möglich. Und überanstrenge dich nicht — wenn sich vier Sekunden lang anfühlt, beginne mit drei. Schon fünf Minuten reichen, um die Wirkung zu spüren."
+
+  [coherent-breathing]="Kohärente Atmung — auch Resonanzatmung — bedeutet, in einem präzisen Rhythmus zu atmen, der Herz, Lunge und Nervensystem in einen gemeinsamen Takt bringt. Das Muster ist einfach: fünfeinhalb Sekunden einatmen, fünfeinhalb Sekunden ausatmen. Das sind etwa fünfeinhalb Atemzüge pro Minute.
+
+Warum genau diese Zahl? Rund fünf bis sechs Atemzüge pro Minute treffen die Resonanzfrequenz deines Herz-Kreislauf-Systems. In diesem Tempo erreicht die Herzratenvariabilität — der Goldstandard-Marker für autonome Flexibilität — ihr Maximum. Der Blutdruck stabilisiert sich. Stress-Marker sinken.
+
+Es ist keine schnelle Lösung. Sie wirkt durch Wiederholung. Zehn bis fünfzehn Minuten am Tag, mehrmals pro Woche, trainieren deine Grundlinie neu. Sportler, Soldaten und Menschen mit Ängsten nutzen es als Grundpraxis.
+
+Lass dich führen — dafür sind wir da. Den Fünfeinhalb-Sekunden-Takt allein zu halten, ist schwer."
+
+  [alternate-nostril]="Wechselatmung — Nadi Shodhana im Sanskrit — gleicht die beiden Seiten deines Nervensystems aus, indem du abwechselnd durch das eine und das andere Nasenloch atmest. Auf den ersten Blick wirkt es umständlich, der Rhythmus ist aber unkompliziert.
+
+Atme vier Sekunden durch das linke Nasenloch ein. Schließe es, öffne das rechte, und atme vier Sekunden rechts aus. Dann vier Sekunden rechts einatmen. Wechseln, vier Sekunden links ausatmen. Das ist ein voller Zyklus.
+
+Traditionell benutzt man die rechte Hand: Daumen, um das rechte Nasenloch zu schließen, Ringfinger für das linke. Oder stell es dir nur vor — Visualisierung wirkt für den beruhigenden Effekt fast genauso gut.
+
+Forschung zeigt: diese Praxis verbessert Aufmerksamkeit, senkt den Blutdruck und gleicht die Herzratenvariabilität aus. Yogis nutzen sie vor der Meditation, um mentalen Lärm zu klären. Besonders gut vor Aufgaben, die Konzentration verlangen — Arbeit, Lernen, alles, was länger Aufmerksamkeit braucht.
+
+Beeile dich nicht. Es geht um den langsamen, wechselnden Rhythmus, nicht um die Zählung."
+
+  [equal-breathing]="Gleichmäßige Atmung, Sama Vritti, ist die einfachste Fokuspraxis, die du machen kannst. Vier Sekunden einatmen. Vier Sekunden ausatmen. Das ist die ganze Technik.
+
+Die Einfachheit ist der Punkt. Indem beide Hälften des Atems gleich lang sind, gibst du deinem Geist einen festen Anker. Jede Ein- und Ausatmung wird zu einer kleinen Einheit Aufmerksamkeit. Wandern die Gedanken ab — und das werden sie — kehrst du einfach zur Zählung zurück.
+
+Das ist die Praxis, die Meditierende seit Jahrhunderten nutzen. Moderne Forschung verbindet anhaltende gleichmäßige Atmung mit besserer Aufmerksamkeitsspanne, besserer Emotionsregulation und weniger Grübeln. Sie ist nicht spektakulär. Sie ist grundlegend.
+
+Nutze sie als fünfminütigen Aufmerksamkeits-Reset zwischen Aufgaben. Oder dehne die Zählung auf sechs oder acht Sekunden, für tiefere Wirkung — vier funktioniert aber genauso. Der Schlüssel ist Beständigkeit, nicht Intensität."
+)
+
 # Split args at "--" separator: voices before, slugs after.
 TARGET_VOICES=()
 TARGET_SLUGS=()
@@ -162,13 +260,19 @@ for voice in "${TARGET_VOICES[@]}"; do
   mkdir -p "$out_dir"
   echo "=== $voice (model=$model_id) ==="
 
+  if is_de_voice "$voice"; then
+    declare -n active_tutorials=TUTORIALS_DE
+  else
+    declare -n active_tutorials=TUTORIALS
+  fi
+
   for slug in "${TARGET_SLUGS[@]}"; do
-    if [[ -z "${TUTORIALS[$slug]+x}" ]]; then
+    if [[ -z "${active_tutorials[$slug]+x}" ]]; then
       echo "Unknown tutorial slug: $slug" >&2
       echo "Available: ${ALL_SLUGS[*]}" >&2
       exit 1
     fi
-    text="${TUTORIALS[$slug]}"
+    text="${active_tutorials[$slug]}"
     out_file="$out_dir/tutorial-$slug.mp3"
     raw_file="$TMP_DIR/$voice-$slug-raw.mp3"
     echo "  $slug (${#text} chars)"

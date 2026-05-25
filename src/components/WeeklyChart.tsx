@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { CATEGORIES, type Category } from "@/lib/techniques";
 import type { SessionEntry } from "@/lib/storage";
 
@@ -57,13 +58,12 @@ function buildDays(history: SessionEntry[], windowDays = 14): Day[] {
   return out;
 }
 
-/** Single-letter weekday: S M T W T F S. */
-function weekdayLetter(d: Date): string {
-  return d.toLocaleDateString(undefined, { weekday: "narrow" });
-}
-
 export function WeeklyChart({ history }: { history: SessionEntry[] }) {
+  const { t, i18n } = useTranslation();
   const days = useMemo(() => buildDays(history), [history]);
+
+  const weekdayLetter = (d: Date): string =>
+    d.toLocaleDateString(i18n.language, { weekday: "narrow" });
   const max = useMemo(
     () =>
       Math.max(
@@ -81,15 +81,15 @@ export function WeeklyChart({ history }: { history: SessionEntry[] }) {
 
   return (
     <section
-      aria-label="Last 14 days"
+      aria-label={t("history.last14Days")}
       className="p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10 mb-6"
     >
       <div className="flex items-baseline justify-between mb-3">
         <div className="text-xs uppercase tracking-widest text-slate-600 dark:text-slate-400">
-          Last 14 days
+          {t("history.last14Days")}
         </div>
         <div className="text-[10px] text-slate-500 tabular-nums">
-          peak {Math.round(max)}m
+          {t("history.peakMinutes", { n: Math.round(max) })}
         </div>
       </div>
 
@@ -144,13 +144,15 @@ export function WeeklyChart({ history }: { history: SessionEntry[] }) {
                 aria-hidden
                 className={`inline-block w-2 h-2 rounded-sm ${CATEGORY_FILL[c]}`}
               />
-              <span>{CATEGORIES[c].title}</span>
+              <span>
+                {t(`categories.${c}.title`, { defaultValue: CATEGORIES[c].title })}
+              </span>
             </div>
           ))}
         </div>
       ) : (
         <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
-          No sessions in the last two weeks yet.
+          {t("history.noSessionsInWindow")}
         </p>
       )}
     </section>

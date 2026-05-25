@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { CategoryMeta } from "@/lib/techniques";
 
 type Props = { meta: CategoryMeta };
 
 export function CategoryCard({ meta }: Props) {
+  const { t } = useTranslation();
   return (
     <Link
       to={`/category/${meta.id}`}
@@ -14,9 +16,11 @@ export function CategoryCard({ meta }: Props) {
     >
       <div className="text-4xl">{meta.emoji}</div>
       <div>
-        <div className="text-lg font-medium text-slate-900 dark:text-slate-100">{meta.title}</div>
+        <div className="text-lg font-medium text-slate-900 dark:text-slate-100">
+          {t(`categories.${meta.id}.title`, { defaultValue: meta.title })}
+        </div>
         <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-snug">
-          {meta.tagline}
+          {t(`categories.${meta.id}.tagline`, { defaultValue: meta.tagline })}
         </div>
       </div>
     </Link>

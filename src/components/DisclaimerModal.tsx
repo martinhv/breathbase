@@ -2,16 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   open: boolean;
   onAcknowledge: () => void;
   onClose?: () => void;
-  /**
-   * When true, acknowledgment is required: the dialog can't be dismissed,
-   * and the user must explicitly check the consent box before the
-   * acknowledge button enables.
-   */
   required?: boolean;
 };
 
@@ -21,10 +17,9 @@ export function DisclaimerModal({
   onClose,
   required,
 }: Props) {
+  const { t } = useTranslation();
   const [consented, setConsented] = useState(false);
 
-  // Reset the checkbox each time the modal opens so a previously-checked
-  // state doesn't auto-accept a reopened modal.
   useEffect(() => {
     if (open) setConsented(false);
   }, [open]);
@@ -41,27 +36,15 @@ export function DisclaimerModal({
     >
       <div className="w-full sm:max-w-md bg-white dark:bg-ink-800 border border-slate-900/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl safe-bottom max-h-[85vh] overflow-y-auto">
         <h2 id="disclaimer-title" className="text-xl font-medium mb-3">
-          A note on safety
+          {t("disclaimer.title")}
         </h2>
         <div className="space-y-3 text-slate-700 dark:text-slate-300 text-sm">
           <p>
-            <strong>Sough is not medical advice.</strong> It is an
-            educational tool to support a personal breathwork practice.
+            <strong>{t("disclaimer.notMedical")}</strong> {t("disclaimer.educational")}
           </p>
-          <p>
-            Stop immediately if you feel dizzy or lightheaded. Sit or lie down
-            until the sensation passes.
-          </p>
-          <p>
-            Upregulating techniques (cyclic hyperventilation, bellows breath)
-            should <strong>never</strong> be done in or near water, while
-            driving, or while operating machinery — fainting can occur.
-          </p>
-          <p>
-            Consult a physician before practicing if you are pregnant, or if
-            you have cardiovascular, respiratory, or psychiatric conditions,
-            or a history of seizures.
-          </p>
+          <p>{t("disclaimer.stopIfDizzy")}</p>
+          <p>{t("disclaimer.upregulateWater")}</p>
+          <p>{t("disclaimer.consultPhysician")}</p>
         </div>
 
         {required && (
@@ -74,9 +57,7 @@ export function DisclaimerModal({
               aria-describedby="disclaimer-title"
             />
             <span className="text-sm text-slate-800 dark:text-slate-200 leading-snug">
-              I have read and understood the safety information above. I
-              accept that Sough is an educational tool, not medical
-              advice, and I practice at my own risk.
+              {t("disclaimer.consentLabel")}
             </span>
           </label>
         )}
@@ -87,7 +68,7 @@ export function DisclaimerModal({
               onClick={onClose}
               className="flex-1 px-4 py-3 rounded-2xl border border-slate-900/10 dark:border-white/10 text-slate-800 dark:text-slate-200 hover:bg-slate-900/[0.04] dark:hover:bg-white/5"
             >
-              Close
+              {t("common.close")}
             </button>
           )}
           <button
@@ -95,7 +76,7 @@ export function DisclaimerModal({
             disabled={!canAcknowledge}
             className="flex-1 px-4 py-3 rounded-2xl bg-teal-400/90 text-ink-950 font-medium hover:bg-teal-300 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {required ? "I accept" : "I understand"}
+            {required ? t("disclaimer.accept") : t("disclaimer.understand")}
           </button>
         </div>
       </div>

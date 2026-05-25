@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   PROGRAM,
   PROGRAM_LENGTH,
@@ -17,22 +18,21 @@ import { useSettings } from "@/lib/settings";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 
 function PreEnroll() {
+  const { t } = useTranslation();
   const { update } = useSettings();
   return (
     <div className="p-5 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
       <div className="text-xs uppercase tracking-widest text-teal-300/80 mb-1">
-        Foundational, in five days
+        {t("program.fiveDayHeadline")}
       </div>
       <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-4">
-        One practice per day, each with a brief lesson. Slow breath, resonance,
-        holds, long exhales, and a reset you can use anywhere. About five
-        minutes a day.
+        {t("program.enrollDescription")}
       </p>
       <button
         onClick={() => update({ program: enrollState() })}
         className="px-5 py-2.5 rounded-xl bg-teal-400/90 text-ink-950 text-sm font-medium hover:bg-teal-300"
       >
-        Begin the program
+        {t("program.enrollCta")}
       </button>
     </div>
   );
@@ -41,6 +41,7 @@ function PreEnroll() {
 type DayState = "complete" | "current" | "locked";
 
 function DayCard({ day, state }: { day: ProgramDay; state: DayState }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const audio = useAudioEngine();
   const technique = findTechnique(day.techniqueId);
@@ -79,15 +80,16 @@ function DayCard({ day, state }: { day: ProgramDay; state: DayState }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400">
-            Day {day.day} · {day.durationMin}m
+            {t("program.dayLabel", { day: day.day, mins: day.durationMin })}
           </div>
           <h3 className="text-base font-medium text-slate-900 dark:text-slate-100 truncate">
-            {day.headline}
+            {t(`program_days.${day.day}.headline`, { defaultValue: day.headline })}
           </h3>
         </div>
       </header>
       <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-        {technique?.name ?? day.techniqueId} — {day.why}
+        {technique?.name ?? day.techniqueId} —{" "}
+        {t(`program_days.${day.day}.why`, { defaultValue: day.why })}
       </p>
       {isCurrent && technique && (
         <div className="mt-3 flex justify-end">
@@ -95,7 +97,7 @@ function DayCard({ day, state }: { day: ProgramDay; state: DayState }) {
             onClick={begin}
             className="px-4 py-2 rounded-xl bg-teal-400/90 text-ink-950 text-sm font-medium hover:bg-teal-300"
           >
-            Begin · {day.durationMin}m
+            {t("session.beginWithDuration", { mins: day.durationMin })}
           </button>
         </div>
       )}
@@ -104,26 +106,28 @@ function DayCard({ day, state }: { day: ProgramDay; state: DayState }) {
 }
 
 function PageHeader() {
+  const { t } = useTranslation();
   return (
     <header className="pt-4 pb-5 flex items-center gap-3">
       <Link
         to="/"
-        aria-label="Back"
+        aria-label={t("common.back")}
         className="p-2 -ml-2 rounded-full hover:bg-slate-900/[0.04] dark:hover:bg-white/5 text-slate-600 dark:text-slate-400"
       >
         ←
       </Link>
       <div>
         <div className="text-xs uppercase tracking-widest text-slate-500">
-          {PROGRAM.emoji} Five-day program
+          {PROGRAM.emoji} {t("program.badge")}
         </div>
-        <h1 className="text-2xl font-light">{PROGRAM.name}</h1>
+        <h1 className="text-2xl font-light">{t("programMeta.name")}</h1>
       </div>
     </header>
   );
 }
 
 export function Program() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const programState = settings.program;
 
@@ -147,7 +151,9 @@ export function Program() {
       <section className="mb-5 p-4 rounded-2xl bg-slate-900/[0.04] dark:bg-white/5 border border-slate-900/10 dark:border-white/10">
         <div className="flex items-center justify-between mb-2">
           <div className="text-xs uppercase tracking-widest text-teal-300/80">
-            {complete ? "Program complete" : `Day ${next} of ${PROGRAM_LENGTH}`}
+            {complete
+              ? t("program.statusComplete")
+              : t("program.statusDay", { day: next, total: PROGRAM_LENGTH })}
           </div>
           <div className="text-xs text-slate-600 dark:text-slate-400 tabular-nums">
             {doneCount}/{PROGRAM_LENGTH}
@@ -161,16 +167,14 @@ export function Program() {
         </div>
         {complete && (
           <p className="text-sm text-slate-700 dark:text-slate-300 mt-3 leading-relaxed">
-            You've worked through the foundations. Keep practicing whichever
-            techniques resonated — themes on the home screen are a good way
-            to pick one for the moment.
+            {t("program.completeBlurb")}
           </p>
         )}
       </section>
 
       {import.meta.env.DEV && (
         <div className="mb-3 px-3 py-2 rounded-xl bg-amber-400/10 border border-amber-400/30 text-[11px] text-amber-300/90">
-          DEV — all days unlocked for testing
+          {t("program.devUnlock")}
         </div>
       )}
 
