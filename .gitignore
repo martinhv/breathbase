@@ -15,3 +15,15 @@ functions/.firebase
 *.tsbuildinfo
 
 tmp/
+
+# Android TWA (bubblewrap)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+# Signing key — never commit. Keep an off-repo backup.
+android/*.keystore
+# Build artifacts — regenerable via `npm run android:build`.
+android/*.apk
+android/*.apk.idsig
+android/*.aab

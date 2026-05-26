@@ -93,7 +93,7 @@ export const DEFAULT_SETTINGS: Settings = {
   musicEnabled: true,
   soundscape: "piano",
   chimesEnabled: true,
-  hapticsEnabled: true,
+  hapticsEnabled: false,
   masterVolume: 0.8,
   musicVolume: 0.6,
   chimeVolume: 0.7,

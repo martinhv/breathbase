@@ -11,7 +11,13 @@ export default defineConfig({
       // banner. The mid-session swap risk is small (the SW activates on
       // controllerchange / navigation, not in the middle of a tick).
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icon-512.svg", "icon-512.png", "icon-192.png"],
+      includeAssets: [
+        "favicon.svg",
+        "icon-512.svg",
+        "icon-512.png",
+        "icon-512-maskable.png",
+        "icon-192.png",
+      ],
       workbox: {
         // Voice mp3s are *not* precached — that would force every user to
         // download all 5 voices' worth of clips (~1.5MB) on first visit.
@@ -74,7 +80,7 @@ export default defineConfig({
             purpose: "any",
           },
           {
-            src: "icon-512.png",
+            src: "icon-512-maskable.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
